@@ -19,10 +19,10 @@ import {
   type PersistentStorageStatus,
 } from "@/data/deviceSettings";
 import { db, ensureDatabaseReady } from "@/data/db";
-import { ReferenceDataScreen } from "@/features/reference-data/ReferenceDataScreen";
 import { AccountsScreen } from "@/features/accounts/AccountsScreen";
 import { CategoriesScreen } from "@/features/categories/CategoriesScreen";
 import { PayeesScreen } from "@/features/payees/PayeesScreen";
+import { LabelsScreen } from "@/features/labels/LabelsScreen";
 
 const navigation = [
   { to: "/accounts", label: "Accounts", icon: CircleDollarSign },
@@ -117,13 +117,7 @@ export default function App() {
               />
               <Route
                 path="/labels"
-                element={
-                  <ReferenceDataScreen
-                    title="Labels"
-                    singularName="label"
-                    icon={Tags}
-                  />
-                }
+                element={<LabelsScreen />}
               />
               <Route path="*" element={<Navigate to="/accounts" replace />} />
             </Routes>
