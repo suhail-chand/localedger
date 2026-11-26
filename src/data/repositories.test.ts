@@ -821,6 +821,39 @@ describe("data repositories", () => {
     });
   });
 
+  it("does not allow editing the built-in category", async () => {
+    const database = await setupDatabase("category-built-in-edit");
+    await ensureDatabaseReady(database);
+    const categories = createCategoryRepository(database);
+    const other = await database.categories
+      .where("name")
+      .equals("Other")
+      .first();
+    if (!other) throw new Error("Other category missing");
+
+    await expect(
+      categories.update(other.id, { name: "Renamed" }),
+    ).rejects.toThrow("Built-in categories cannot be edited");
+  });
+
+  it("does not allow changing a category group kind with mismatched categories", async () => {
+    const database = await setupDatabase("category-group-kind-update");
+    await ensureDatabaseReady(database);
+    const groups = createCategoryGroupRepository(database);
+    const categories = createCategoryRepository(database);
+    const group = await groups.create({ name: "Mixed", kind: "expense" });
+    await categories.create({
+      name: "Expense category",
+      icon: "tag",
+      groupId: group.id,
+      kind: "expense",
+    });
+
+    await expect(
+      groups.update(group.id, { kind: "income" }),
+    ).rejects.toThrow("Category group kind cannot differ");
+  });
+
   it("blocks deleting groups that still contain active records", async () => {
     const database = await setupDatabase("group-in-use");
     const categoryGroups = createCategoryGroupRepository(database);

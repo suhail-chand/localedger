@@ -21,6 +21,7 @@ import {
 import { db, ensureDatabaseReady } from "@/data/db";
 import { ReferenceDataScreen } from "@/features/reference-data/ReferenceDataScreen";
 import { AccountsScreen } from "@/features/accounts/AccountsScreen";
+import { CategoriesScreen } from "@/features/categories/CategoriesScreen";
 
 const navigation = [
   { to: "/accounts", label: "Accounts", icon: CircleDollarSign },
@@ -107,13 +108,7 @@ export default function App() {
               />
               <Route
                 path="/categories"
-                element={
-                  <ReferenceDataScreen
-                    title="Categories"
-                    singularName="category"
-                    icon={FolderTree}
-                  />
-                }
+                element={<CategoriesScreen />}
               />
               <Route
                 path="/payees"

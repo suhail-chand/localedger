@@ -248,6 +248,37 @@ export function createCategoryGroupRepository(
   );
   return {
     ...repository,
+    async update(id: string, changes: RecordChanges<CategoryGroup>): Promise<CategoryGroup> {
+      return database.transaction(
+        "rw",
+        [database.categoryGroups, database.categories],
+        async () => {
+          const existing = await repository.get(id);
+          if (!existing) {
+            throw new Error(`Record ${id} does not exist`);
+          }
+          const updated = categoryGroupSchema.parse({
+            ...existing,
+            ...changes,
+            id,
+            updatedAt: toUtcIso(options.now?.() ?? new Date()),
+          });
+          if (updated.kind !== existing.kind) {
+            const mismatched = await database.categories
+              .filter((category) => category.groupId === id)
+              .filter((category) => category.kind !== updated.kind)
+              .count();
+            if (mismatched > 0) {
+              throw new Error(
+                "Category group kind cannot differ from its categories",
+              );
+            }
+          }
+          await database.categoryGroups.put(updated);
+          return updated;
+        },
+      );
+    },
     async softDelete(id: string): Promise<CategoryGroup> {
       return database.transaction(
         "rw",
@@ -332,6 +363,9 @@ export function createCategoryRepository(
           const existing = await repository.get(id);
           if (!existing) {
             throw new Error(`Record ${id} does not exist`);
+          }
+          if (existing.builtIn) {
+            throw new Error("Built-in categories cannot be edited");
           }
           const updated = categorySchema.parse({
             ...existing,
