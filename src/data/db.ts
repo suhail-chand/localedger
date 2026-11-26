@@ -21,6 +21,27 @@ import {
 } from '@/data/migrations';
 import { seedDefaults } from '@/data/seed';
 
+export interface BackupSnapshot {
+  id: string;
+  createdAt: string;
+  document: {
+    schemaVersion: number;
+    exportedAt: string;
+    data: {
+      accounts: Account[];
+      categoryGroups: CategoryGroup[];
+      categories: Category[];
+      payeeGroups: PayeeGroup[];
+      payees: Payee[];
+      labels: Label[];
+      transactions: Transaction[];
+      scheduledTransactions: ScheduledTransaction[];
+      occurrenceRecords: OccurrenceRecord[];
+      settings: Settings[];
+    };
+  };
+}
+
 export class LocaledgerDatabase extends Dexie {
   metadata!: Table<SchemaMetadata, 'schema'>;
   accounts!: Table<Account, string>;
@@ -34,6 +55,7 @@ export class LocaledgerDatabase extends Dexie {
   occurrenceRecords!: Table<OccurrenceRecord, string>;
   settings!: Table<Settings, string>;
   deviceSettings!: Table<unknown, string>;
+  backupSnapshots!: Table<BackupSnapshot, string>;
 
   constructor(name = 'localedger') {
     super(name);
@@ -51,6 +73,10 @@ export class LocaledgerDatabase extends Dexie {
       occurrenceRecords: '&id, scheduleId, occurrenceAt, outcome, updatedAt, deleted',
       settings: '&id, updatedAt, deleted',
       deviceSettings: '&key',
+    });
+
+    this.version(2).stores({
+      backupSnapshots: '&id, createdAt',
     });
   }
 }
