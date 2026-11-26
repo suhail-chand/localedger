@@ -1,5 +1,17 @@
 import { useEffect, useState } from "react";
-import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import {
+  HashRouter,
+  Navigate,
+  NavLink,
+  Route,
+  Routes,
+} from "react-router-dom";
+import {
+  CircleDollarSign,
+  FolderTree,
+  Tags,
+  Users,
+} from "lucide-react";
 
 import {
   initializeDeviceSettings,
@@ -7,6 +19,14 @@ import {
   type PersistentStorageStatus,
 } from "@/data/deviceSettings";
 import { db, ensureDatabaseReady } from "@/data/db";
+import { ReferenceDataScreen } from "@/features/reference-data/ReferenceDataScreen";
+
+const navigation = [
+  { to: "/accounts", label: "Accounts", icon: CircleDollarSign },
+  { to: "/categories", label: "Categories", icon: FolderTree },
+  { to: "/payees", label: "Payees", icon: Users },
+  { to: "/labels", label: "Labels", icon: Tags },
+];
 
 export default function App() {
   const [storageStatus, setStorageStatus] =
@@ -47,33 +67,106 @@ export default function App() {
         v7_relativeSplatPath: true,
       }}
     >
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-6 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <section
-                className="max-w-md text-center"
-                aria-labelledby="app-title"
+      <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
+        <aside className="hidden border-r border-gray-200 bg-white px-4 py-6 dark:border-gray-800 dark:bg-gray-900 md:flex md:flex-col">
+          <h1 className="px-3 text-xl font-semibold">Localedger</h1>
+          <nav className="mt-8 space-y-1" aria-label="Reference data">
+            {navigation.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 ${
+                    isActive
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  }`
+                }
               >
-                <h1 id="app-title" className="text-3xl font-semibold">
-                  Localedger
-                </h1>
-                <p className="mt-3 text-gray-600 dark:text-gray-300">
-                  Your local-first personal finance tracker.
-                </p>
-                <p
-                  className="mt-4 text-sm text-gray-500 dark:text-gray-400"
-                  role="status"
-                >
-                  Persistent storage: {storageStatus}
-                </p>
-              </section>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+          <p className="mt-auto px-3 text-xs text-gray-500" role="status">
+            Persistent storage: {storageStatus}
+          </p>
+        </aside>
+
+        <main className="min-w-0 pb-20 md:pb-0">
+          <header className="flex h-14 items-center border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 md:hidden">
+            <h1 className="font-semibold">Localedger</h1>
+          </header>
+          <div className="p-4 md:p-8">
+            <Routes>
+              <Route path="/" element={<Navigate to="/accounts" replace />} />
+              <Route
+                path="/accounts"
+                element={
+                  <ReferenceDataScreen
+                    title="Accounts"
+                    singularName="account"
+                    icon={CircleDollarSign}
+                  />
+                }
+              />
+              <Route
+                path="/categories"
+                element={
+                  <ReferenceDataScreen
+                    title="Categories"
+                    singularName="category"
+                    icon={FolderTree}
+                  />
+                }
+              />
+              <Route
+                path="/payees"
+                element={
+                  <ReferenceDataScreen
+                    title="Payees"
+                    singularName="payee"
+                    icon={Users}
+                  />
+                }
+              />
+              <Route
+                path="/labels"
+                element={
+                  <ReferenceDataScreen
+                    title="Labels"
+                    singularName="label"
+                    icon={Tags}
+                  />
+                }
+              />
+              <Route path="*" element={<Navigate to="/accounts" replace />} />
+            </Routes>
+          </div>
+        </main>
+
+        <nav
+          className="fixed inset-x-0 bottom-0 grid h-16 grid-cols-4 border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 md:hidden"
+          aria-label="Reference data mobile"
+        >
+          {navigation.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `flex min-h-16 flex-col items-center justify-center gap-1 text-xs ${
+                  isActive
+                    ? "text-blue-700 dark:text-blue-300"
+                    : "text-gray-600 dark:text-gray-300"
+                }`
+              }
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
     </HashRouter>
   );
 }
