@@ -20,6 +20,7 @@ import {
   type SchemaMetadata,
 } from '@/data/migrations';
 import { seedDefaults } from '@/data/seed';
+import type { DeviceSettings } from '@/data/deviceSettings';
 
 export interface BackupSnapshot {
   id: string;
@@ -54,7 +55,7 @@ export class LocaledgerDatabase extends Dexie {
   scheduledTransactions!: Table<ScheduledTransaction, string>;
   occurrenceRecords!: Table<OccurrenceRecord, string>;
   settings!: Table<Settings, string>;
-  deviceSettings!: Table<unknown, string>;
+  deviceSettings!: Table<DeviceSettings, string>;
   backupSnapshots!: Table<BackupSnapshot, string>;
 
   constructor(name = 'localedger') {
