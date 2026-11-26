@@ -505,6 +505,9 @@ export function createPayeeRepository(
           if (!existing) {
             throw new Error(`Record ${id} does not exist`);
           }
+          if (existing.builtIn) {
+            throw new Error("Built-in payees cannot be edited");
+          }
           const updated = payeeSchema.parse({
             ...existing,
             ...changes,

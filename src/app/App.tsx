@@ -22,6 +22,7 @@ import { db, ensureDatabaseReady } from "@/data/db";
 import { ReferenceDataScreen } from "@/features/reference-data/ReferenceDataScreen";
 import { AccountsScreen } from "@/features/accounts/AccountsScreen";
 import { CategoriesScreen } from "@/features/categories/CategoriesScreen";
+import { PayeesScreen } from "@/features/payees/PayeesScreen";
 
 const navigation = [
   { to: "/accounts", label: "Accounts", icon: CircleDollarSign },
@@ -112,13 +113,7 @@ export default function App() {
               />
               <Route
                 path="/payees"
-                element={
-                  <ReferenceDataScreen
-                    title="Payees"
-                    singularName="payee"
-                    icon={Users}
-                  />
-                }
+                element={<PayeesScreen />}
               />
               <Route
                 path="/labels"

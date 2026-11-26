@@ -559,6 +559,21 @@ describe("data repositories", () => {
     expect((await payees.get(payee.id))?.deleted).toBe(false);
   });
 
+  it("protects the built-in Unspecified payee from editing", async () => {
+    const database = await setupDatabase("payee-builtin-edit");
+    const payees = createPayeeRepository(database);
+    const unspecified = await database.payees
+      .where("name")
+      .equals("Unspecified")
+      .first();
+    if (!unspecified) throw new Error("Unspecified payee missing");
+
+    await expect(
+      payees.update(unspecified.id, { name: "Other" }),
+    ).rejects.toThrow("Built-in payees cannot be edited");
+    expect((await payees.get(unspecified.id))?.name).toBe("Unspecified");
+  });
+
   it("reassigns payee references and refuses to purge active records", async () => {
     const database = await setupDatabase("payee-reassignment");
     const payees = createPayeeRepository(

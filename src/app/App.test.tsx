@@ -57,6 +57,31 @@ describe("App", () => {
     expect(within(sheet).getByRole("alert")).toBeInTheDocument();
   });
 
+  it("navigates to payees and opens the add sheet", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const payeesLink = screen
+      .getAllByRole("link", { name: "Payees" })
+      .at(0);
+    if (!payeesLink) throw new Error("Payees navigation link was not rendered");
+    await user.click(payeesLink);
+    expect(
+      screen.getAllByRole("heading", { name: "Payees" }).length,
+    ).toBeGreaterThan(0);
+
+    const addPayeeButton = screen
+      .getAllByRole("button", { name: "Add payee" })
+      .at(0);
+    if (!addPayeeButton) {
+      throw new Error("Add payee button was not rendered");
+    }
+    await user.click(addPayeeButton);
+    expect(
+      screen.getByRole("dialog", { name: "Add payee" }),
+    ).toBeInTheDocument();
+  });
+
   it("redirects unknown hash routes to accounts", async () => {
     window.history.replaceState(null, "", "#/unknown");
     render(<App />);
