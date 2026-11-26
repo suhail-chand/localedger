@@ -20,6 +20,7 @@ import {
 } from "@/data/deviceSettings";
 import { db, ensureDatabaseReady } from "@/data/db";
 import { ReferenceDataScreen } from "@/features/reference-data/ReferenceDataScreen";
+import { AccountsScreen } from "@/features/accounts/AccountsScreen";
 
 const navigation = [
   { to: "/accounts", label: "Accounts", icon: CircleDollarSign },
@@ -102,13 +103,7 @@ export default function App() {
               <Route path="/" element={<Navigate to="/accounts" replace />} />
               <Route
                 path="/accounts"
-                element={
-                  <ReferenceDataScreen
-                    title="Accounts"
-                    singularName="account"
-                    icon={CircleDollarSign}
-                  />
-                }
+                element={<AccountsScreen />}
               />
               <Route
                 path="/categories"

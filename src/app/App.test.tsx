@@ -40,7 +40,7 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses the shared confirmation dialog for a pending destructive action", async () => {
+  it("opens the account sheet and validates account fields", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -52,20 +52,9 @@ describe("App", () => {
     }
     await user.click(addAccountButton);
     const sheet = screen.getByRole("dialog", { name: "Add account" });
-    await user.click(within(sheet).getByRole("button", { name: "Continue" }));
-
-    const confirmation = screen.getByRole("alertdialog", {
-      name: "Confirm account action",
-    });
-    expect(confirmation).toBeInTheDocument();
-    await user.click(
-      within(confirmation).getByRole("button", { name: "Cancel" }),
-    );
-    expect(
-      screen.queryByRole("alertdialog", {
-        name: "Confirm account action",
-      }),
-    ).not.toBeInTheDocument();
+    expect(within(sheet).getByLabelText("Name")).toBeInTheDocument();
+    await user.click(within(sheet).getByRole("button", { name: "Save" }));
+    expect(within(sheet).getByRole("alert")).toBeInTheDocument();
   });
 
   it("redirects unknown hash routes to accounts", async () => {
