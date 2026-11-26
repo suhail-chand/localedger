@@ -1,20 +1,20 @@
-import type { LocaledgerDatabase } from '@/data/db';
-import { toUtcIso } from '@/domain/ids';
-import { LOCAL_SCHEMA_VERSION } from '@/data/migrations';
-import type { Category, CategoryGroup, Payee } from '@/domain/types';
+import type { LocaledgerDatabase } from "@/data/db";
+import { toUtcIso } from "@/domain/ids";
+import { LOCAL_SCHEMA_VERSION } from "@/data/migrations";
+import type { Category, CategoryGroup, Payee } from "@/domain/types";
 import {
   categoryGroupSchema,
   categorySchema,
   payeeSchema,
-} from '@/domain/schemas';
+} from "@/domain/schemas";
 
-const SEED_IDS = {
-  expenseGroup: '10000000-0000-4000-8000-000000000001',
-  incomeGroup: '10000000-0000-4000-8000-000000000002',
-  other: '20000000-0000-4000-8000-000000000001',
-  unspecified: '30000000-0000-4000-8000-000000000001',
-  interest: '20000000-0000-4000-8000-000000000002',
-  tax: '20000000-0000-4000-8000-000000000003',
+export const SEED_IDS = {
+  expenseGroup: "10000000-0000-4000-8000-000000000001",
+  incomeGroup: "10000000-0000-4000-8000-000000000002",
+  other: "20000000-0000-4000-8000-000000000001",
+  unspecified: "30000000-0000-4000-8000-000000000001",
+  interest: "20000000-0000-4000-8000-000000000002",
+  tax: "20000000-0000-4000-8000-000000000003",
 } as const;
 
 function seedTimestamp(now: Date): string {
@@ -28,7 +28,7 @@ export async function seedDefaults(
   const timestamp = seedTimestamp(now);
 
   await database.transaction(
-    'rw',
+    "rw",
     [
       database.metadata,
       database.categoryGroups,
@@ -36,7 +36,7 @@ export async function seedDefaults(
       database.payees,
     ],
     async () => {
-      const existingMetadata = await database.metadata.get('schema');
+      const existingMetadata = await database.metadata.get("schema");
       if (existingMetadata) {
         return;
       }
@@ -47,16 +47,16 @@ export async function seedDefaults(
           createdAt: timestamp,
           updatedAt: timestamp,
           deleted: false,
-          name: 'Expenses',
-          kind: 'expense',
+          name: "Expenses",
+          kind: "expense",
         },
         {
           id: SEED_IDS.incomeGroup,
           createdAt: timestamp,
           updatedAt: timestamp,
           deleted: false,
-          name: 'Income',
-          kind: 'income',
+          name: "Income",
+          kind: "income",
         },
       ];
 
@@ -66,10 +66,10 @@ export async function seedDefaults(
           createdAt: timestamp,
           updatedAt: timestamp,
           deleted: false,
-          name: 'Other',
-          icon: 'ellipsis',
+          name: "Other",
+          icon: "ellipsis",
           groupId: SEED_IDS.expenseGroup,
-          kind: 'expense',
+          kind: "expense",
           builtIn: true,
         },
         {
@@ -77,20 +77,20 @@ export async function seedDefaults(
           createdAt: timestamp,
           updatedAt: timestamp,
           deleted: false,
-          name: 'Interest',
-          icon: 'percent',
+          name: "Interest",
+          icon: "percent",
           groupId: SEED_IDS.expenseGroup,
-          kind: 'expense',
+          kind: "expense",
         },
         {
           id: SEED_IDS.tax,
           createdAt: timestamp,
           updatedAt: timestamp,
           deleted: false,
-          name: 'Tax',
-          icon: 'receipt',
+          name: "Tax",
+          icon: "receipt",
           groupId: SEED_IDS.expenseGroup,
-          kind: 'expense',
+          kind: "expense",
         },
       ];
 
@@ -99,7 +99,7 @@ export async function seedDefaults(
         createdAt: timestamp,
         updatedAt: timestamp,
         deleted: false,
-        name: 'Unspecified',
+        name: "Unspecified",
         builtIn: true,
       };
 
@@ -115,7 +115,7 @@ export async function seedDefaults(
       await database.categories.bulkPut(categories);
       await database.payees.put(unspecified);
       await database.metadata.put({
-        key: 'schema',
+        key: "schema",
         version: LOCAL_SCHEMA_VERSION,
       });
     },

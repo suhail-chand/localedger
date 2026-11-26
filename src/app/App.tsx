@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import {
   initializeDeviceSettings,
   requestPersistentStorage,
   type PersistentStorageStatus,
-} from '@/data/deviceSettings';
-import { db, ensureDatabaseReady } from '@/data/db';
+} from "@/data/deviceSettings";
+import { db, ensureDatabaseReady } from "@/data/db";
 
 export default function App() {
   const [storageStatus, setStorageStatus] =
-    useState<PersistentStorageStatus>('checking');
+    useState<PersistentStorageStatus>("checking");
 
   useEffect(() => {
     let cancelled = false;
@@ -20,7 +20,10 @@ export default function App() {
       await initializeDeviceSettings(db);
       const status = await requestPersistentStorage(
         navigator.storage as
-          | { persist?: () => Promise<boolean>; persisted?: () => Promise<boolean> }
+          | {
+              persist?: () => Promise<boolean>;
+              persisted?: () => Promise<boolean>;
+            }
           | undefined,
       );
       if (!cancelled) {
@@ -28,7 +31,7 @@ export default function App() {
       }
     })().catch(() => {
       if (!cancelled) {
-        setStorageStatus('error');
+        setStorageStatus("error");
       }
     });
 
@@ -59,7 +62,10 @@ export default function App() {
                 <p className="mt-3 text-gray-600 dark:text-gray-300">
                   Your local-first personal finance tracker.
                 </p>
-                <p className="mt-4 text-sm text-gray-500 dark:text-gray-400" role="status">
+                <p
+                  className="mt-4 text-sm text-gray-500 dark:text-gray-400"
+                  role="status"
+                >
                   Persistent storage: {storageStatus}
                 </p>
               </section>

@@ -1,6 +1,62 @@
-import type { LocaledgerDatabase } from '@/data/db';
-import { toUtcIso } from '@/domain/ids';
-import { categorySchema, payeeSchema, transactionSchema } from '@/domain/schemas';
+import type { LocaledgerDatabase } from "@/data/db";
+import { SEED_IDS } from "@/data/seed";
+import { toUtcIso } from "@/domain/ids";
+import {
+  accountSchema,
+  categorySchema,
+  occurrenceRecordSchema,
+  payeeSchema,
+  scheduledTransactionSchema,
+  transactionSchema,
+} from "@/domain/schemas";
+import { scanTransactions } from "@/data/transactionScan";
+import { assertAccountNotInUse } from "@/data/referenceIntegrity";
+
+export class BuiltInFallbackError extends Error {
+  constructor(kind: "category" | "payee") {
+    super(`Built-in ${kind} fallback is missing or invalid`);
+    this.name = "BuiltInFallbackError";
+  }
+}
+
+export class DeletedAccountInUseError extends Error {
+  constructor(accountId: string) {
+    super(`Cannot purge account ${accountId}; it is still referenced`);
+    this.name = "DeletedAccountInUseError";
+  }
+}
+
+async function assertCategoryFallbackAvailable(
+  database: LocaledgerDatabase,
+): Promise<void> {
+  const fallback = categorySchema.safeParse(
+    await database.categories.get(SEED_IDS.other),
+  );
+  if (
+    !fallback.success ||
+    fallback.data.id !== SEED_IDS.other ||
+    fallback.data.builtIn !== true ||
+    fallback.data.deleted
+  ) {
+    throw new BuiltInFallbackError("category");
+  }
+}
+
+async function assertPayeeFallbackAvailable(
+  database: LocaledgerDatabase,
+): Promise<void> {
+  const fallback = payeeSchema.safeParse(
+    await database.payees.get(SEED_IDS.unspecified),
+  );
+  if (
+    !fallback.success ||
+    fallback.data.id !== SEED_IDS.unspecified ||
+    fallback.data.builtIn !== true ||
+    fallback.data.deleted
+  ) {
+    throw new BuiltInFallbackError("payee");
+  }
+}
 
 export async function deleteCategoryAndReassign(
   database: LocaledgerDatabase,
@@ -9,21 +65,25 @@ export async function deleteCategoryAndReassign(
   now = new Date(),
 ): Promise<void> {
   await database.transaction(
-    'rw',
-    [database.categories, database.transactions],
+    "rw",
+    [
+      database.categories,
+      database.transactions,
+      database.scheduledTransactions,
+    ],
     async () => {
       const category = await database.categories.get(categoryId);
       if (!category) {
         throw new Error(`Category ${categoryId} does not exist`);
       }
       if (category.builtIn) {
-        throw new Error('Built-in categories cannot be deleted');
+        throw new Error("Built-in categories cannot be deleted");
       }
 
-      const fallback = await database.categories.get(fallbackCategoryId);
-      if (!fallback || fallback.builtIn !== true) {
-        throw new Error('Fallback must be a built-in Other category');
+      if (fallbackCategoryId !== SEED_IDS.other) {
+        throw new BuiltInFallbackError("category");
       }
+      await assertCategoryFallbackAvailable(database);
 
       const timestamp = toUtcIso(now);
       const deletedCategory = categorySchema.parse({
@@ -31,14 +91,12 @@ export async function deleteCategoryAndReassign(
         deleted: true,
         updatedAt: timestamp,
       });
-      const transactions = await database.transactions.toArray();
-
       await database.categories.put(deletedCategory);
-      for (const transaction of transactions) {
+      await scanTransactions(database, async (transaction) => {
         let changed = false;
         const splits = transaction.splits.map((split) => {
           if (
-            (split.type === 'expense' || split.type === 'income') &&
+            (split.type === "expense" || split.type === "income") &&
             split.categoryId === categoryId
           ) {
             changed = true;
@@ -55,6 +113,30 @@ export async function deleteCategoryAndReassign(
             }),
           );
         }
+      });
+      const schedules = await database.scheduledTransactions.toArray();
+      for (const record of schedules) {
+        const schedule = scheduledTransactionSchema.parse(record);
+        let changed = false;
+        const splits = schedule.template.splits.map((split) => {
+          if (
+            (split.type === "expense" || split.type === "income") &&
+            split.categoryId === categoryId
+          ) {
+            changed = true;
+            return { ...split, categoryId: fallbackCategoryId };
+          }
+          return split;
+        });
+        if (changed) {
+          await database.scheduledTransactions.put(
+            scheduledTransactionSchema.parse({
+              ...schedule,
+              template: { ...schedule.template, splits },
+              updatedAt: timestamp,
+            }),
+          );
+        }
       }
     },
   );
@@ -67,21 +149,21 @@ export async function deletePayeeAndReassign(
   now = new Date(),
 ): Promise<void> {
   await database.transaction(
-    'rw',
-    [database.payees, database.transactions],
+    "rw",
+    [database.payees, database.transactions, database.scheduledTransactions],
     async () => {
       const payee = await database.payees.get(payeeId);
       if (!payee) {
         throw new Error(`Payee ${payeeId} does not exist`);
       }
       if (payee.builtIn) {
-        throw new Error('Built-in payees cannot be deleted');
+        throw new Error("Built-in payees cannot be deleted");
       }
 
-      const fallback = await database.payees.get(fallbackPayeeId);
-      if (!fallback || fallback.builtIn !== true) {
-        throw new Error('Fallback must be a built-in Unspecified payee');
+      if (fallbackPayeeId !== SEED_IDS.unspecified) {
+        throw new BuiltInFallbackError("payee");
       }
+      await assertPayeeFallbackAvailable(database);
 
       const timestamp = toUtcIso(now);
       const deletedPayee = payeeSchema.parse({
@@ -89,14 +171,12 @@ export async function deletePayeeAndReassign(
         deleted: true,
         updatedAt: timestamp,
       });
-      const transactions = await database.transactions.toArray();
-
       await database.payees.put(deletedPayee);
-      for (const transaction of transactions) {
+      await scanTransactions(database, async (transaction) => {
         let changed = false;
         const splits = transaction.splits.map((split) => {
           if (
-            (split.type === 'expense' || split.type === 'income') &&
+            (split.type === "expense" || split.type === "income") &&
             split.payeeId === payeeId
           ) {
             changed = true;
@@ -113,15 +193,41 @@ export async function deletePayeeAndReassign(
             }),
           );
         }
+      });
+      const schedules = await database.scheduledTransactions.toArray();
+      for (const record of schedules) {
+        const schedule = scheduledTransactionSchema.parse(record);
+        let changed = false;
+        const splits = schedule.template.splits.map((split) => {
+          if (
+            (split.type === "expense" || split.type === "income") &&
+            split.payeeId === payeeId
+          ) {
+            changed = true;
+            return { ...split, payeeId: fallbackPayeeId };
+          }
+          return split;
+        });
+        if (changed) {
+          await database.scheduledTransactions.put(
+            scheduledTransactionSchema.parse({
+              ...schedule,
+              template: { ...schedule.template, splits },
+              updatedAt: timestamp,
+            }),
+          );
+        }
       }
     },
   );
 }
 
-export async function purgeTrash(database: LocaledgerDatabase): Promise<number> {
+export async function purgeTrash(
+  database: LocaledgerDatabase,
+): Promise<number> {
   let purged = 0;
   await database.transaction(
-    'rw',
+    "rw",
     [
       database.accounts,
       database.categoryGroups,
@@ -135,6 +241,206 @@ export async function purgeTrash(database: LocaledgerDatabase): Promise<number> 
       database.settings,
     ],
     async () => {
+      const timestamp = toUtcIso(new Date());
+      const deletedCategories = (
+        await database.categories.filter((record) => record.deleted).toArray()
+      ).map((record) => categorySchema.parse(record).id);
+      const deletedPayees = (
+        await database.payees.filter((record) => record.deleted).toArray()
+      ).map((record) => payeeSchema.parse(record).id);
+      const deletedAccounts = (
+        await database.accounts.filter((record) => record.deleted).toArray()
+      ).map((record) => accountSchema.parse(record).id);
+
+      for (const accountId of deletedAccounts) {
+        if (
+          await assertAccountNotInUse(database, accountId, {
+            excludeDeletedRecords: true,
+          })
+        ) {
+          throw new DeletedAccountInUseError(accountId);
+        }
+      }
+
+      if (deletedCategories.length > 0) {
+        await assertCategoryFallbackAvailable(database);
+      }
+      if (deletedPayees.length > 0) {
+        await assertPayeeFallbackAvailable(database);
+      }
+
+      const deletedSchedules = (
+        await database.scheduledTransactions
+          .filter((record) => record.deleted)
+          .toArray()
+      ).map((record) => scheduledTransactionSchema.parse(record).id);
+      if (deletedSchedules.length > 0) {
+        await database.occurrenceRecords
+          .filter((record) => deletedSchedules.includes(record.scheduleId))
+          .delete();
+      }
+
+      const deletedTransactions = (
+        await database.transactions.filter((record) => record.deleted).toArray()
+      ).map((record) => transactionSchema.parse(record).id);
+      if (deletedTransactions.length > 0) {
+        const occurrenceRecords = await database.occurrenceRecords
+          .filter(
+            (record) =>
+              record.transactionId !== undefined &&
+              deletedTransactions.includes(record.transactionId),
+          )
+          .toArray();
+        for (const record of occurrenceRecords) {
+          const occurrence = occurrenceRecordSchema.parse(record);
+          await database.occurrenceRecords.put(
+            occurrenceRecordSchema.parse({
+              ...occurrence,
+              transactionId: undefined,
+              updatedAt: timestamp,
+            }),
+          );
+        }
+      }
+
+      if (deletedCategories.length > 0) {
+        await scanTransactions(database, async (transaction) => {
+          let changed = false;
+          const splits = transaction.splits.map((split) => {
+            if (
+              (split.type === "expense" || split.type === "income") &&
+              split.categoryId &&
+              deletedCategories.includes(split.categoryId)
+            ) {
+              changed = true;
+              return { ...split, categoryId: SEED_IDS.other };
+            }
+            return split;
+          });
+          if (changed) {
+            await database.transactions.put(
+              transactionSchema.parse({
+                ...transaction,
+                splits,
+                updatedAt: timestamp,
+              }),
+            );
+          }
+        });
+        const schedules = await database.scheduledTransactions.toArray();
+        for (const record of schedules) {
+          const schedule = scheduledTransactionSchema.parse(record);
+          let changed = false;
+          const splits = schedule.template.splits.map((split) => {
+            if (
+              (split.type === "expense" || split.type === "income") &&
+              split.categoryId &&
+              deletedCategories.includes(split.categoryId)
+            ) {
+              changed = true;
+              return { ...split, categoryId: SEED_IDS.other };
+            }
+            return split;
+          });
+          if (changed) {
+            await database.scheduledTransactions.put(
+              scheduledTransactionSchema.parse({
+                ...schedule,
+                template: { ...schedule.template, splits },
+                updatedAt: timestamp,
+              }),
+            );
+          }
+        }
+      }
+
+      if (deletedPayees.length > 0) {
+        await scanTransactions(database, async (transaction) => {
+          let changed = false;
+          const splits = transaction.splits.map((split) => {
+            if (
+              (split.type === "expense" || split.type === "income") &&
+              split.payeeId &&
+              deletedPayees.includes(split.payeeId)
+            ) {
+              changed = true;
+              return { ...split, payeeId: SEED_IDS.unspecified };
+            }
+            return split;
+          });
+          if (changed) {
+            await database.transactions.put(
+              transactionSchema.parse({
+                ...transaction,
+                splits,
+                updatedAt: timestamp,
+              }),
+            );
+          }
+        });
+        const schedules = await database.scheduledTransactions.toArray();
+        for (const record of schedules) {
+          const schedule = scheduledTransactionSchema.parse(record);
+          let changed = false;
+          const splits = schedule.template.splits.map((split) => {
+            if (
+              (split.type === "expense" || split.type === "income") &&
+              split.payeeId &&
+              deletedPayees.includes(split.payeeId)
+            ) {
+              changed = true;
+              return { ...split, payeeId: SEED_IDS.unspecified };
+            }
+            return split;
+          });
+          if (changed) {
+            await database.scheduledTransactions.put(
+              scheduledTransactionSchema.parse({
+                ...schedule,
+                template: { ...schedule.template, splits },
+                updatedAt: timestamp,
+              }),
+            );
+          }
+        }
+      }
+
+      const deletedLabels = (
+        await database.labels.filter((record) => record.deleted).toArray()
+      ).map((record) => record.id);
+      if (deletedLabels.length > 0) {
+        await scanTransactions(database, async (transaction) => {
+          const labelIds = transaction.labelIds.filter(
+            (labelId) => !deletedLabels.includes(labelId),
+          );
+          if (labelIds.length !== transaction.labelIds.length) {
+            await database.transactions.put(
+              transactionSchema.parse({
+                ...transaction,
+                labelIds,
+                updatedAt: timestamp,
+              }),
+            );
+          }
+        });
+        const schedules = await database.scheduledTransactions.toArray();
+        for (const record of schedules) {
+          const schedule = scheduledTransactionSchema.parse(record);
+          const labelIds = schedule.template.labelIds.filter(
+            (labelId) => !deletedLabels.includes(labelId),
+          );
+          if (labelIds.length !== schedule.template.labelIds.length) {
+            await database.scheduledTransactions.put(
+              scheduledTransactionSchema.parse({
+                ...schedule,
+                template: { ...schedule.template, labelIds },
+                updatedAt: timestamp,
+              }),
+            );
+          }
+        }
+      }
+
       const tables = [
         database.accounts,
         database.categoryGroups,
@@ -148,9 +454,39 @@ export async function purgeTrash(database: LocaledgerDatabase): Promise<number> 
         database.settings,
       ];
       for (const table of tables) {
-        const deletedRecords = await table.filter((record) => record.deleted).toArray();
-        await table.bulkDelete(deletedRecords.map((record) => record.id));
-        purged += deletedRecords.length;
+        const deletedRecords = await table
+          .filter((record) => record.deleted)
+          .toArray();
+        if (table === database.categoryGroups) {
+          const activeGroupIds = new Set(
+            (
+              await database.categories
+                .filter((record) => !record.deleted)
+                .toArray()
+            ).map((record) => record.groupId),
+          );
+          const purgeableIds = deletedRecords
+            .filter((record) => !activeGroupIds.has(record.id))
+            .map((record) => record.id);
+          await table.bulkDelete(purgeableIds);
+          purged += purgeableIds.length;
+        } else if (table === database.payeeGroups) {
+          const activeGroupIds = new Set(
+            (
+              await database.payees
+                .filter((record) => !record.deleted)
+                .toArray()
+            ).flatMap((record) => (record.groupId ? [record.groupId] : [])),
+          );
+          const purgeableIds = deletedRecords
+            .filter((record) => !activeGroupIds.has(record.id))
+            .map((record) => record.id);
+          await table.bulkDelete(purgeableIds);
+          purged += purgeableIds.length;
+        } else {
+          await table.bulkDelete(deletedRecords.map((record) => record.id));
+          purged += deletedRecords.length;
+        }
       }
     },
   );

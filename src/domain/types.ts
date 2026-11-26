@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import type { z } from "zod";
 
 import type {
   accountTypeSchema,
@@ -13,9 +13,9 @@ import type {
   settingsSchema,
   splitSchema,
   transactionSchema,
-} from '@/domain/schemas';
+} from "@/domain/schemas";
 
-export type Paise = number & { readonly __brand: 'Paise' };
+export type Paise = number & { readonly __brand: "Paise" };
 export type AccountType = z.infer<typeof accountTypeSchema>;
 export type Account = z.infer<typeof accountSchema>;
 export type CategoryGroup = z.infer<typeof categoryGroupSchema>;

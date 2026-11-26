@@ -1,22 +1,28 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-import { utcIsoSchema, uuidSchema } from '@/domain/ids';
+import { MAX_PAISE } from "@/domain/constants";
+import { utcIsoSchema, uuidSchema } from "@/domain/ids";
+
+export { MAX_PAISE } from "@/domain/constants";
 
 export const paiseSchema = z
   .number()
   .int()
-  .transform((value) => value as number & { readonly __brand: 'Paise' });
+  .safe()
+  .min(-MAX_PAISE)
+  .max(MAX_PAISE)
+  .transform((value) => value as number & { readonly __brand: "Paise" });
 
 export const accountTypeSchema = z.enum([
-  'cash',
-  'savings',
-  'credit_card',
-  'loan',
-  'liability',
-  'payable',
-  'receivable',
-  'investment',
-  'other',
+  "cash",
+  "savings",
+  "credit_card",
+  "loan",
+  "liability",
+  "payable",
+  "receivable",
+  "investment",
+  "other",
 ]);
 
 export const baseRecordSchema = z
@@ -35,7 +41,7 @@ export const accountSchema = baseRecordSchema
     type: accountTypeSchema,
     openingDate: utcIsoSchema,
     startingBalance: paiseSchema,
-    currency: z.literal('INR'),
+    currency: z.literal("INR"),
     note: z.string(),
     hideFromTransactions: z.boolean(),
     hideFromReports: z.boolean(),
@@ -45,7 +51,7 @@ export const accountSchema = baseRecordSchema
 export const categoryGroupSchema = baseRecordSchema
   .extend({
     name: z.string().trim().min(1),
-    kind: z.enum(['expense', 'income']),
+    kind: z.enum(["expense", "income"]),
   })
   .strict();
 
@@ -54,7 +60,7 @@ export const categorySchema = baseRecordSchema
     name: z.string().trim().min(1),
     icon: z.string().min(1),
     groupId: uuidSchema,
-    kind: z.enum(['expense', 'income']),
+    kind: z.enum(["expense", "income"]),
     builtIn: z.boolean().optional(),
   })
   .strict();
@@ -83,14 +89,17 @@ export const labelSchema = baseRecordSchema
 const splitBaseSchema = z
   .object({
     id: uuidSchema,
-    amount: paiseSchema.refine((value) => value > 0, 'Amount must be greater than zero'),
+    amount: paiseSchema.refine(
+      (value) => value > 0,
+      "Amount must be greater than zero",
+    ),
     note: z.string(),
   })
   .strict();
 
 export const expenseSplitSchema = splitBaseSchema
   .extend({
-    type: z.literal('expense'),
+    type: z.literal("expense"),
     accountId: uuidSchema,
     categoryId: uuidSchema.optional(),
     payeeId: uuidSchema.optional(),
@@ -99,7 +108,7 @@ export const expenseSplitSchema = splitBaseSchema
 
 export const incomeSplitSchema = splitBaseSchema
   .extend({
-    type: z.literal('income'),
+    type: z.literal("income"),
     accountId: uuidSchema,
     categoryId: uuidSchema.optional(),
     payeeId: uuidSchema.optional(),
@@ -108,17 +117,17 @@ export const incomeSplitSchema = splitBaseSchema
 
 export const transferSplitSchema = splitBaseSchema
   .extend({
-    type: z.literal('transfer'),
+    type: z.literal("transfer"),
     fromAccountId: uuidSchema,
     toAccountId: uuidSchema,
   })
   .strict()
   .refine(
     (split) => split.fromAccountId !== split.toAccountId,
-    'Transfer from and to accounts must differ',
+    "Transfer from and to accounts must differ",
   );
 
-export const splitSchema = z.discriminatedUnion('type', [
+export const splitSchema = z.discriminatedUnion("type", [
   expenseSplitSchema,
   incomeSplitSchema,
   transferSplitSchema,
@@ -128,42 +137,42 @@ export const transactionSchema = baseRecordSchema
   .extend({
     title: z.string().trim().min(1),
     occurredAt: utcIsoSchema,
-    currency: z.literal('INR'),
+    currency: z.literal("INR"),
     splits: z.array(splitSchema).min(1),
     labelIds: z.array(uuidSchema),
-    status: z.enum(['uncleared', 'cleared', 'reconciled']),
+    status: z.enum(["uncleared", "cleared", "reconciled"]),
     note: z.string(),
     scheduleId: uuidSchema.optional(),
     occurrenceAt: utcIsoSchema.optional(),
   })
   .strict();
 
-export const recurrenceSchema = z.discriminatedUnion('type', [
+export const recurrenceSchema = z.discriminatedUnion("type", [
   z
     .object({
-      type: z.literal('once'),
+      type: z.literal("once"),
     })
     .strict(),
   z
     .object({
-      type: z.literal('every'),
+      type: z.literal("every"),
       n: z.number().int().positive(),
-      unit: z.enum(['day', 'week', 'month', 'year']),
+      unit: z.enum(["day", "week", "month", "year"]),
     })
     .strict(),
 ]);
 
 export const scheduledTransactionSchema = baseRecordSchema
   .extend({
-    scheduleType: z.enum(['one_time', 'recurring', 'emi']),
+    scheduleType: z.enum(["one_time", "recurring", "emi"]),
     template: z
       .object({
         title: z.string().trim().min(1),
         occurredAt: utcIsoSchema,
-        currency: z.literal('INR'),
+        currency: z.literal("INR"),
         splits: z.array(splitSchema).min(1),
         labelIds: z.array(uuidSchema),
-        status: z.enum(['uncleared', 'cleared', 'reconciled']),
+        status: z.enum(["uncleared", "cleared", "reconciled"]),
         note: z.string(),
       })
       .strict(),
@@ -172,7 +181,7 @@ export const scheduledTransactionSchema = baseRecordSchema
     endAt: utcIsoSchema.optional(),
     maxEntries: z.number().int().positive().optional(),
     autoRecord: z.boolean(),
-    status: z.enum(['active', 'paused', 'completed']),
+    status: z.enum(["active", "paused", "completed"]),
     lastEvaluatedAt: utcIsoSchema.optional(),
     seriesId: uuidSchema.optional(),
     emi: z
@@ -191,14 +200,14 @@ export const occurrenceRecordSchema = baseRecordSchema
   .extend({
     scheduleId: uuidSchema,
     occurrenceAt: utcIsoSchema,
-    outcome: z.enum(['recorded', 'skipped']),
+    outcome: z.enum(["recorded", "skipped"]),
     transactionId: uuidSchema.optional(),
   })
   .strict();
 
 export const settingsSchema = baseRecordSchema
   .extend({
-    theme: z.enum(['light', 'dark', 'system']),
+    theme: z.enum(["light", "dark", "system"]),
     reminderLeadMinutes: z.number().int().nonnegative(),
     backupsToKeep: z.number().int().positive(),
   })

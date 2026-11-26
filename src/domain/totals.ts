@@ -1,5 +1,5 @@
-import type { Account, Paise, Transaction } from '@/domain/types';
-import { toPaise } from '@/domain/money';
+import type { Account, Paise, Transaction } from "@/domain/types";
+import { toPaise } from "@/domain/money";
 
 export interface TransactionTotals {
   income: Paise;
@@ -13,7 +13,7 @@ export function calculateTransactionIncome(transaction: Transaction): Paise {
   }
   return safeSum(
     transaction.splits
-      .filter((split) => split.type === 'income')
+      .filter((split) => split.type === "income")
       .map((split) => split.amount),
   );
 }
@@ -24,7 +24,7 @@ export function calculateTransactionExpense(transaction: Transaction): Paise {
   }
   return safeSum(
     transaction.splits
-      .filter((split) => split.type === 'expense')
+      .filter((split) => split.type === "expense")
       .map((split) => split.amount),
   );
 }
@@ -74,11 +74,11 @@ export function calculateDashboardTotals(
       continue;
     }
     for (const split of transaction.splits) {
-      if (split.type === 'income') {
+      if (split.type === "income") {
         if (visibleAccountIds.has(split.accountId)) {
           income += BigInt(split.amount);
         }
-      } else if (split.type === 'expense') {
+      } else if (split.type === "expense") {
         if (visibleAccountIds.has(split.accountId)) {
           expense += BigInt(split.amount);
         }
@@ -101,15 +101,24 @@ export function calculateMonthlyTotals(
   year: number,
   month: number,
 ): TransactionTotals {
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-    throw new RangeError('Month and year must define a valid calendar month');
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    month < 1 ||
+    month > 12
+  ) {
+    throw new RangeError("Month and year must define a valid calendar month");
   }
 
   const startTime = Date.UTC(year, month - 1, 1);
   const endTime = Date.UTC(year, month, 1);
   const inMonth = transactions.filter((transaction) => {
     const occurredTime = Date.parse(transaction.occurredAt);
-    return !transaction.deleted && occurredTime >= startTime && occurredTime < endTime;
+    return (
+      !transaction.deleted &&
+      occurredTime >= startTime &&
+      occurredTime < endTime
+    );
   });
   return calculateDashboardTotals(inMonth, accounts);
 }
@@ -125,8 +134,11 @@ function safeSum(values: readonly Paise[]): Paise {
 }
 
 function checkedPaise(value: bigint): Paise {
-  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) {
-    throw new RangeError('Paise total exceeds the safe integer range');
+  if (
+    value > BigInt(Number.MAX_SAFE_INTEGER) ||
+    value < BigInt(Number.MIN_SAFE_INTEGER)
+  ) {
+    throw new RangeError("Paise total exceeds the safe integer range");
   }
   return toPaise(Number(value));
 }

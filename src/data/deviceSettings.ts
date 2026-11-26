@@ -1,13 +1,13 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-import type { LocaledgerDatabase } from '@/data/db';
-import { uuidSchema, utcIsoSchema } from '@/domain/ids';
+import type { LocaledgerDatabase } from "@/data/db";
+import { uuidSchema, utcIsoSchema } from "@/domain/ids";
 
 export const deviceSettingsSchema = z
   .object({
-    key: z.literal('device'),
+    key: z.literal("device"),
     deviceId: uuidSchema,
-    storageMode: z.enum(['local', 'drive']),
+    storageMode: z.enum(["local", "drive"]),
     googleClientId: z.string().min(1).optional(),
     lastSync: utcIsoSchema.optional(),
     setupComplete: z.boolean(),
@@ -17,11 +17,7 @@ export const deviceSettingsSchema = z
 export type DeviceSettings = z.infer<typeof deviceSettingsSchema>;
 
 export type PersistentStorageStatus =
-  | 'checking'
-  | 'granted'
-  | 'denied'
-  | 'unsupported'
-  | 'error';
+  "checking" | "granted" | "denied" | "unsupported" | "error";
 
 export interface DeviceSettingsOptions {
   idFactory?: () => string;
@@ -40,15 +36,15 @@ export async function initializeDeviceSettings(
   database: LocaledgerDatabase,
   options: DeviceSettingsOptions = {},
 ): Promise<DeviceSettings> {
-  const existing = await database.deviceSettings.get('device');
+  const existing = await database.deviceSettings.get("device");
   if (existing) {
     return deviceSettingsSchema.parse(existing);
   }
 
   const settings = deviceSettingsSchema.parse({
-    key: 'device',
+    key: "device",
     deviceId: (options.idFactory ?? defaultIdFactory)(),
-    storageMode: 'local',
+    storageMode: "local",
     setupComplete: false,
   });
   await database.deviceSettings.put(settings);
@@ -58,15 +54,13 @@ export async function initializeDeviceSettings(
 export async function getDeviceSettings(
   database: LocaledgerDatabase,
 ): Promise<DeviceSettings | undefined> {
-  const settings = await database.deviceSettings.get('device');
+  const settings = await database.deviceSettings.get("device");
   return settings ? deviceSettingsSchema.parse(settings) : undefined;
 }
 
 export async function updateDeviceSettings(
   database: LocaledgerDatabase,
-  changes: Partial<
-    Omit<DeviceSettings, 'key' | 'deviceId'>
-  >,
+  changes: Partial<Omit<DeviceSettings, "key" | "deviceId">>,
 ): Promise<DeviceSettings> {
   const existing = await initializeDeviceSettings(database);
   const updated = deviceSettingsSchema.parse({
@@ -79,20 +73,20 @@ export async function updateDeviceSettings(
 
 export async function requestPersistentStorage(
   storage: StoragePersistenceApi | undefined,
-): Promise<Exclude<PersistentStorageStatus, 'checking'>> {
+): Promise<Exclude<PersistentStorageStatus, "checking">> {
   if (!storage?.persist) {
-    return 'unsupported';
+    return "unsupported";
   }
 
   try {
     if (storage.persisted) {
       const alreadyPersisted = await storage.persisted();
       if (alreadyPersisted) {
-        return 'granted';
+        return "granted";
       }
     }
-    return (await storage.persist()) ? 'granted' : 'denied';
+    return (await storage.persist()) ? "granted" : "denied";
   } catch {
-    return 'error';
+    return "error";
   }
 }

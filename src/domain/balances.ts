@@ -1,5 +1,5 @@
-import type { Account, Paise, Transaction } from '@/domain/types';
-import { toPaise } from '@/domain/money';
+import type { Account, Paise, Transaction } from "@/domain/types";
+import { toPaise } from "@/domain/money";
 
 export interface AccountBalance {
   accountId: string;
@@ -26,11 +26,11 @@ export function calculateAccountBalance(
     }
 
     for (const split of transaction.splits) {
-      if (split.type === 'income' && split.accountId === account.id) {
+      if (split.type === "income" && split.accountId === account.id) {
         balance = addPaise(balance, split.amount);
-      } else if (split.type === 'expense' && split.accountId === account.id) {
+      } else if (split.type === "expense" && split.accountId === account.id) {
         balance = subtractPaise(balance, split.amount);
-      } else if (split.type === 'transfer') {
+      } else if (split.type === "transfer") {
         if (split.toAccountId === account.id) {
           balance = addPaise(balance, split.amount);
         } else if (split.fromAccountId === account.id) {
@@ -77,7 +77,9 @@ export function calculateBalanceSheet(
   transactions: readonly Transaction[],
 ): readonly AccountBalance[] {
   return calculateAccountBalances(accounts, transactions).filter((entry) => {
-    const account = accounts.find((candidate) => candidate.id === entry.accountId);
+    const account = accounts.find(
+      (candidate) => candidate.id === entry.accountId,
+    );
     return account !== undefined && !account.hideFromReports;
   });
 }
@@ -95,8 +97,11 @@ function safeCheckedSum(values: readonly Paise[]): Paise {
 }
 
 function checkedPaise(value: bigint): Paise {
-  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) {
-    throw new RangeError('Paise balance exceeds the safe integer range');
+  if (
+    value > BigInt(Number.MAX_SAFE_INTEGER) ||
+    value < BigInt(Number.MIN_SAFE_INTEGER)
+  ) {
+    throw new RangeError("Paise balance exceeds the safe integer range");
   }
   return toPaise(Number(value));
 }

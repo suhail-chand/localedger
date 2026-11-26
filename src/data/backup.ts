@@ -1,12 +1,13 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-import type { BackupSnapshot, LocaledgerDatabase } from '@/data/db';
+import type { BackupSnapshot, LocaledgerDatabase } from "@/data/db";
+import { SEED_IDS } from "@/data/seed";
 import {
   assertSupportedSchemaVersion,
   LOCAL_SCHEMA_VERSION,
   type SchemaMetadata,
-} from '@/data/migrations';
-import { toUtcIso, utcIsoSchema, uuidSchema } from '@/domain/ids';
+} from "@/data/migrations";
+import { toUtcIso, utcIsoSchema, uuidSchema } from "@/domain/ids";
 import {
   accountSchema,
   categoryGroupSchema,
@@ -18,7 +19,7 @@ import {
   scheduledTransactionSchema,
   settingsSchema,
   transactionSchema,
-} from '@/domain/schemas';
+} from "@/domain/schemas";
 const backupDataSchema = z
   .object({
     accounts: z.array(accountSchema),
@@ -43,6 +44,52 @@ export const backupDocumentSchema = z
   .strict();
 
 export type BackupDocument = z.infer<typeof backupDocumentSchema>;
+
+export type BackupIntegrityKind =
+  | "splitAccount"
+  | "splitCategory"
+  | "splitCategoryKind"
+  | "splitPayee"
+  | "label"
+  | "templateSplitAccount"
+  | "templateSplitCategory"
+  | "templateSplitCategoryKind"
+  | "templateSplitPayee"
+  | "templateLabel"
+  | "categoryGroup"
+  | "categoryKind"
+  | "payeeGroup"
+  | "builtInCategory"
+  | "builtInPayee"
+  | "occurrenceSchedule"
+  | "occurrenceTransaction";
+
+export interface BackupIntegrityReport {
+  counts: Partial<Record<BackupIntegrityKind, number>>;
+  firstFewIds: Partial<Record<BackupIntegrityKind, string[]>>;
+}
+
+export interface RestoreBackupResult {
+  currentDataSnapshotted: boolean;
+}
+
+export interface RestoreLatestSnapshotResult extends RestoreBackupResult {
+  snapshot: BackupSnapshot;
+}
+
+export class BackupIntegrityError extends Error {
+  constructor(public readonly report: BackupIntegrityReport) {
+    super("Backup contains dangling references");
+    this.name = "BackupIntegrityError";
+  }
+}
+
+class DuplicateRecordIdsError extends Error {
+  constructor() {
+    super("Backup contains duplicate record IDs");
+    this.name = "DuplicateRecordIdsError";
+  }
+}
 
 export interface BackupOptions {
   now?: () => Date;
@@ -69,7 +116,178 @@ function validateUniqueIds(document: BackupDocument): void {
   ];
 
   if (new Set(ids).size !== ids.length) {
-    throw new Error('Backup contains duplicate record IDs');
+    throw new DuplicateRecordIdsError();
+  }
+}
+
+function validateBackupReferentialIntegrity(document: BackupDocument): void {
+  const report: BackupIntegrityReport = { counts: {}, firstFewIds: {} };
+
+  const add = (kind: BackupIntegrityKind, id: string): void => {
+    report.counts[kind] = (report.counts[kind] ?? 0) + 1;
+    const ids = report.firstFewIds[kind] ?? [];
+    if (!ids.includes(id) && ids.length < 5) {
+      ids.push(id);
+      report.firstFewIds[kind] = ids;
+    }
+  };
+
+  const activeIds = (records: readonly { id: string; deleted: boolean }[]) =>
+    new Set(
+      records.filter((record) => !record.deleted).map((record) => record.id),
+    );
+  const allIds = (records: readonly { id: string }[]) =>
+    new Set(records.map((record) => record.id));
+
+  const accountIds = activeIds(document.data.accounts);
+  const categoryIds = activeIds(document.data.categories);
+  const categoryById = new Map(
+    document.data.categories.map((category) => [category.id, category]),
+  );
+  const categoryGroupById = new Map(
+    document.data.categoryGroups.map((group) => [group.id, group]),
+  );
+  const payeeIds = activeIds(document.data.payees);
+  const labelIds = activeIds(document.data.labels);
+  const categoryGroupIds = allIds(document.data.categoryGroups);
+  const payeeGroupIds = allIds(document.data.payeeGroups);
+  const activeCategoryGroupIds = activeIds(document.data.categoryGroups);
+  const activePayeeGroupIds = activeIds(document.data.payeeGroups);
+  const scheduleIds = allIds(document.data.scheduledTransactions);
+  const transactionIds = allIds(document.data.transactions);
+
+  for (const category of document.data.categories) {
+    const groupExists = category.deleted
+      ? categoryGroupIds.has(category.groupId)
+      : activeCategoryGroupIds.has(category.groupId);
+    if (!groupExists) {
+      add("categoryGroup", category.groupId);
+    }
+    const group = categoryGroupById.get(category.groupId);
+    if (group && group.kind !== category.kind) {
+      add("categoryKind", category.id);
+    }
+  }
+  for (const payee of document.data.payees) {
+    const groupIds = payee.deleted ? payeeGroupIds : activePayeeGroupIds;
+    if (payee.groupId && !groupIds.has(payee.groupId)) {
+      add("payeeGroup", payee.groupId);
+    }
+  }
+
+  const other = document.data.categories.find(
+    (record) => record.id === SEED_IDS.other,
+  );
+  if (!other || other.deleted || !other.builtIn) {
+    add("builtInCategory", SEED_IDS.other);
+  }
+  const unspecified = document.data.payees.find(
+    (record) => record.id === SEED_IDS.unspecified,
+  );
+  if (!unspecified || unspecified.deleted || !unspecified.builtIn) {
+    add("builtInPayee", SEED_IDS.unspecified);
+  }
+
+  const validateTemplateSplits = (
+    splits: (typeof document.data.transactions)[number]["splits"],
+    prefix: "template",
+  ): void => {
+    for (const split of splits) {
+      if (split.type === "transfer") {
+        if (!accountIds.has(split.fromAccountId)) {
+          add(
+            prefix === "template" ? "templateSplitAccount" : "splitAccount",
+            split.fromAccountId,
+          );
+        }
+        if (!accountIds.has(split.toAccountId)) {
+          add(
+            prefix === "template" ? "templateSplitAccount" : "splitAccount",
+            split.toAccountId,
+          );
+        }
+      } else {
+        if (!accountIds.has(split.accountId)) {
+          add(
+            prefix === "template" ? "templateSplitAccount" : "splitAccount",
+            split.accountId,
+          );
+        }
+        if (split.categoryId && !categoryIds.has(split.categoryId)) {
+          add(
+            prefix === "template" ? "templateSplitCategory" : "splitCategory",
+            split.categoryId,
+          );
+        }
+        if (split.categoryId) {
+          const category = categoryById.get(split.categoryId);
+          if (category && category.kind !== split.type) {
+            add(
+              prefix === "template"
+                ? "templateSplitCategoryKind"
+                : "splitCategoryKind",
+              split.categoryId,
+            );
+          }
+        }
+        if (split.payeeId && !payeeIds.has(split.payeeId)) {
+          add(
+            prefix === "template" ? "templateSplitPayee" : "splitPayee",
+            split.payeeId,
+          );
+        }
+      }
+    }
+  };
+
+  for (const transaction of document.data.transactions) {
+    for (const split of transaction.splits) {
+      if (split.type === "transfer") {
+        if (!accountIds.has(split.fromAccountId))
+          add("splitAccount", split.fromAccountId);
+        if (!accountIds.has(split.toAccountId))
+          add("splitAccount", split.toAccountId);
+      } else {
+        if (!accountIds.has(split.accountId))
+          add("splitAccount", split.accountId);
+        if (split.categoryId && !categoryIds.has(split.categoryId))
+          add("splitCategory", split.categoryId);
+        if (split.categoryId) {
+          const category = categoryById.get(split.categoryId);
+          if (category && category.kind !== split.type) {
+            add("splitCategoryKind", split.categoryId);
+          }
+        }
+        if (split.payeeId && !payeeIds.has(split.payeeId))
+          add("splitPayee", split.payeeId);
+      }
+    }
+    for (const labelId of transaction.labelIds) {
+      if (!labelIds.has(labelId)) add("label", labelId);
+    }
+  }
+
+  for (const schedule of document.data.scheduledTransactions) {
+    validateTemplateSplits(schedule.template.splits, "template");
+    for (const labelId of schedule.template.labelIds) {
+      if (!labelIds.has(labelId)) add("templateLabel", labelId);
+    }
+  }
+
+  for (const occurrence of document.data.occurrenceRecords) {
+    if (!scheduleIds.has(occurrence.scheduleId)) {
+      add("occurrenceSchedule", occurrence.scheduleId);
+    }
+    if (
+      occurrence.transactionId &&
+      !transactionIds.has(occurrence.transactionId)
+    ) {
+      add("occurrenceTransaction", occurrence.transactionId);
+    }
+  }
+
+  if (Object.values(report.counts).some((count) => (count ?? 0) > 0)) {
+    throw new BackupIntegrityError(report);
   }
 }
 
@@ -77,31 +295,68 @@ export async function exportBackup(
   database: LocaledgerDatabase,
   now = new Date(),
 ): Promise<string> {
-  const document: BackupDocument = {
-    schemaVersion: LOCAL_SCHEMA_VERSION,
-    exportedAt: toUtcIso(now),
-    data: {
-      accounts: await readValidated(database.accounts.toArray(), accountSchema),
-      categoryGroups: await readValidated(database.categoryGroups.toArray(), categoryGroupSchema),
-      categories: await readValidated(database.categories.toArray(), categorySchema),
-      payeeGroups: await readValidated(database.payeeGroups.toArray(), payeeGroupSchema),
-      payees: await readValidated(database.payees.toArray(), payeeSchema),
-      labels: await readValidated(database.labels.toArray(), labelSchema),
-      transactions: await readValidated(database.transactions.toArray(), transactionSchema),
-      scheduledTransactions: await readValidated(
-        database.scheduledTransactions.toArray(),
-        scheduledTransactionSchema,
-      ),
-      occurrenceRecords: await readValidated(
-        database.occurrenceRecords.toArray(),
-        occurrenceRecordSchema,
-      ),
-      settings: await readValidated(database.settings.toArray(), settingsSchema),
+  const document = await database.transaction(
+    "r",
+    [
+      database.accounts,
+      database.categoryGroups,
+      database.categories,
+      database.payeeGroups,
+      database.payees,
+      database.labels,
+      database.transactions,
+      database.scheduledTransactions,
+      database.occurrenceRecords,
+      database.settings,
+    ],
+    async () => {
+      const data = {
+        accounts: await readValidated(
+          database.accounts.toArray(),
+          accountSchema,
+        ),
+        categoryGroups: await readValidated(
+          database.categoryGroups.toArray(),
+          categoryGroupSchema,
+        ),
+        categories: await readValidated(
+          database.categories.toArray(),
+          categorySchema,
+        ),
+        payeeGroups: await readValidated(
+          database.payeeGroups.toArray(),
+          payeeGroupSchema,
+        ),
+        payees: await readValidated(database.payees.toArray(), payeeSchema),
+        labels: await readValidated(database.labels.toArray(), labelSchema),
+        transactions: await readValidated(
+          database.transactions.toArray(),
+          transactionSchema,
+        ),
+        scheduledTransactions: await readValidated(
+          database.scheduledTransactions.toArray(),
+          scheduledTransactionSchema,
+        ),
+        occurrenceRecords: await readValidated(
+          database.occurrenceRecords.toArray(),
+          occurrenceRecordSchema,
+        ),
+        settings: await readValidated(
+          database.settings.toArray(),
+          settingsSchema,
+        ),
+      };
+      return {
+        schemaVersion: LOCAL_SCHEMA_VERSION,
+        exportedAt: toUtcIso(now),
+        data,
+      } satisfies BackupDocument;
     },
-  };
+  );
 
   const parsed = backupDocumentSchema.parse(document);
   validateUniqueIds(parsed);
+  validateBackupReferentialIntegrity(parsed);
   return JSON.stringify(parsed, null, 2);
 }
 
@@ -118,12 +373,13 @@ export function parseBackupJson(json: string): BackupDocument {
   try {
     parsedJson = JSON.parse(json);
   } catch {
-    throw new Error('Backup JSON is invalid');
+    throw new Error("Backup JSON is invalid");
   }
 
   const document = backupDocumentSchema.parse(parsedJson);
   assertSupportedSchemaVersion(document.schemaVersion);
   validateUniqueIds(document);
+  validateBackupReferentialIntegrity(document);
   return document;
 }
 
@@ -131,28 +387,43 @@ export async function snapshotExistingDatabase(
   database: LocaledgerDatabase,
   options: BackupOptions = {},
 ): Promise<BackupSnapshot> {
+  const snapshotDocument = parseBackupJson(
+    await exportBackup(database, (options.now ?? (() => new Date()))()),
+  );
+  return storeSnapshot(database, snapshotDocument, options);
+}
+
+async function storeSnapshot(
+  database: LocaledgerDatabase,
+  snapshotDocument: BackupDocument,
+  options: BackupOptions,
+): Promise<BackupSnapshot> {
   const now = options.now ?? (() => new Date());
   const idFactory = options.idFactory ?? defaultIdFactory;
   const snapshotsToKeep = options.snapshotsToKeep ?? 5;
 
   if (!Number.isInteger(snapshotsToKeep) || snapshotsToKeep < 1) {
-    throw new Error('snapshotsToKeep must be a positive integer');
+    throw new Error("snapshotsToKeep must be a positive integer");
   }
 
-  const snapshotDocument = parseBackupJson(await exportBackup(database, now()));
   const snapshot: BackupSnapshot = {
     id: uuidSchema.parse(idFactory()),
     createdAt: toUtcIso(now()),
     document: snapshotDocument,
   };
 
-  await database.backupSnapshots.put(snapshot);
-  const snapshots = await database.backupSnapshots.orderBy('createdAt').reverse().toArray();
-  if (snapshots.length > snapshotsToKeep) {
-    await database.backupSnapshots.bulkDelete(
-      snapshots.slice(snapshotsToKeep).map((item) => item.id),
-    );
-  }
+  await database.transaction("rw", [database.backupSnapshots], async () => {
+    await database.backupSnapshots.put(snapshot);
+    const snapshots = await database.backupSnapshots
+      .orderBy("createdAt")
+      .reverse()
+      .toArray();
+    if (snapshots.length > snapshotsToKeep) {
+      await database.backupSnapshots.bulkDelete(
+        snapshots.slice(snapshotsToKeep).map((item) => item.id),
+      );
+    }
+  });
   return snapshot;
 }
 
@@ -161,7 +432,7 @@ async function replaceDatabaseData(
   document: BackupDocument,
 ): Promise<void> {
   await database.transaction(
-    'rw',
+    "rw",
     [
       database.metadata,
       database.accounts,
@@ -196,36 +467,76 @@ async function replaceDatabaseData(
       await database.payees.bulkPut(document.data.payees);
       await database.labels.bulkPut(document.data.labels);
       await database.transactions.bulkPut(document.data.transactions);
-      await database.scheduledTransactions.bulkPut(document.data.scheduledTransactions);
+      await database.scheduledTransactions.bulkPut(
+        document.data.scheduledTransactions,
+      );
       await database.occurrenceRecords.bulkPut(document.data.occurrenceRecords);
       await database.settings.bulkPut(document.data.settings);
       await database.metadata.put({
-        key: 'schema',
+        key: "schema",
         version: LOCAL_SCHEMA_VERSION,
       } satisfies SchemaMetadata);
     },
   );
 }
 
+async function snapshotCurrentDataIfValid(
+  database: LocaledgerDatabase,
+  options: BackupOptions,
+): Promise<boolean> {
+  let exported: string;
+  try {
+    exported = await exportBackup(
+      database,
+      (options.now ?? (() => new Date()))(),
+    );
+  } catch (error) {
+    if (
+      error instanceof z.ZodError ||
+      error instanceof BackupIntegrityError ||
+      error instanceof DuplicateRecordIdsError
+    ) {
+      return false;
+    }
+    throw error;
+  }
+
+  const document = parseBackupJson(exported);
+  await storeSnapshot(database, document, options);
+  return true;
+}
+
 export async function restoreBackup(
   database: LocaledgerDatabase,
   json: string,
   options: BackupOptions = {},
-): Promise<void> {
+): Promise<RestoreBackupResult> {
   const document = parseBackupJson(json);
-  await snapshotExistingDatabase(database, options);
+  const currentDataSnapshotted = await snapshotCurrentDataIfValid(
+    database,
+    options,
+  );
   await replaceDatabaseData(database, document);
+  return { currentDataSnapshotted };
 }
 
 export async function restoreLatestSnapshot(
   database: LocaledgerDatabase,
-): Promise<BackupSnapshot> {
-  const snapshot = await database.backupSnapshots.orderBy('createdAt').reverse().first();
+  options: BackupOptions = {},
+): Promise<RestoreLatestSnapshotResult> {
+  const snapshot = await database.backupSnapshots
+    .orderBy("createdAt")
+    .reverse()
+    .first();
   if (!snapshot) {
-    throw new Error('No backup snapshot is available');
+    throw new Error("No backup snapshot is available");
   }
 
   const document = parseBackupJson(JSON.stringify(snapshot.document));
+  const currentDataSnapshotted = await snapshotCurrentDataIfValid(
+    database,
+    options,
+  );
   await replaceDatabaseData(database, document);
-  return snapshot;
+  return { snapshot, currentDataSnapshotted };
 }

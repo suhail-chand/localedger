@@ -1,10 +1,13 @@
-import { z } from 'zod';
+import { z } from "zod";
 
+// Dexie versions describe IndexedDB table/index structure. LOCAL_SCHEMA_VERSION
+// describes validated record shapes and changes only when record data needs a
+// forward migration. The two version values may therefore advance independently.
 export const LOCAL_SCHEMA_VERSION = 1;
 
 export const schemaMetadataSchema = z
   .object({
-    key: z.literal('schema'),
+    key: z.literal("schema"),
     version: z.number().int().nonnegative(),
   })
   .strict();
@@ -14,7 +17,7 @@ export type SchemaMetadata = z.infer<typeof schemaMetadataSchema>;
 export function assertSupportedSchemaVersion(version: unknown): number {
   const parsed = schemaMetadataSchema.shape.version.safeParse(version);
   if (!parsed.success) {
-    throw new Error('IndexedDB schema version is invalid');
+    throw new Error("IndexedDB schema version is invalid");
   }
 
   if (parsed.data > LOCAL_SCHEMA_VERSION) {
