@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createDeterministicUuid,
+  createOccurrenceId,
+  createOccurrenceRecordId,
+  createScheduledTransactionId,
   createUuidV4,
   isUtcIsoString,
   isUuid,
@@ -22,6 +26,37 @@ describe("UUID helpers", () => {
     expect(() => createUuidV4(Array.from({ length: 16 }, () => 256))).toThrow(
       RangeError,
     );
+  });
+
+  it("creates stable v4-shaped IDs for schedule occurrences", () => {
+    const scheduled = createScheduledTransactionId(
+      "11111111-1111-4111-8111-111111111111",
+      "2026-11-26T10:00:00.000Z",
+    );
+    const occurrence = createOccurrenceRecordId(
+      "11111111-1111-4111-8111-111111111111",
+      "2026-11-26T10:00:00.000Z",
+    );
+
+    expect(scheduled).toBe(
+      createScheduledTransactionId(
+        "11111111-1111-4111-8111-111111111111",
+        "2026-11-26T10:00:00.000Z",
+      ),
+    );
+    expect(occurrence).toBe(
+      createOccurrenceId(
+        "11111111-1111-4111-8111-111111111111",
+        "2026-11-26T10:00:00.000Z",
+      ),
+    );
+    expect(isUuid(scheduled)).toBe(true);
+    expect(isUuid(occurrence)).toBe(true);
+    expect(scheduled).not.toBe(occurrence);
+  });
+
+  it("rejects empty deterministic UUID input", () => {
+    expect(() => createDeterministicUuid("")).toThrow(RangeError);
   });
 });
 

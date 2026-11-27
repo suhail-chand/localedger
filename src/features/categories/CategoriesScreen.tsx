@@ -16,6 +16,83 @@ import {
   Pencil,
   Trash2,
   type LucideIcon,
+  Activity,
+  Apple,
+  Award,
+  Baby,
+  BadgePercent,
+  Banknote,
+  BedDouble,
+  Bike,
+  Bookmark,
+  BookOpen,
+  BriefcaseBusiness,
+  Building2,
+  Bus,
+  Cake,
+  Calendar,
+  ChartNoAxesCombined,
+  Clapperboard,
+  Coffee,
+  Coins,
+  Cookie,
+  CreditCard,
+  Droplets,
+  Dumbbell,
+  Flame,
+  Fuel,
+  Gamepad2,
+  Globe,
+  Hammer,
+  HandCoins,
+  HandHeart,
+  Handshake,
+  HeartHandshake,
+  Hospital,
+  Key,
+  Lamp,
+  Landmark,
+  Monitor,
+  MonitorPlay,
+  Music,
+  Palette,
+  PawPrint,
+  PiggyBank,
+  Pill,
+  Pizza,
+  Plane,
+  Presentation,
+  Shirt,
+  ShoppingBag,
+  Smartphone,
+  Sofa,
+  Star,
+  Stethoscope,
+  Store,
+  Tag,
+  Train,
+  TrendingUp,
+  Trophy,
+  Undo2,
+  UserRound,
+  Users,
+  Wallet,
+  Watch,
+  Wifi,
+  Wrench,
+  Zap,
+  Armchair,
+  CarTaxiFront,
+  Laptop,
+  Map as MapIcon,
+  Hotel,
+  Palmtree,
+  Houses,
+  HouseArrowRight,
+  MonitorPc,
+  MonitorCloud,
+  BallWave,
+  ShieldCheck,
 } from "lucide-react";
 
 import { Button } from "@/components/Button";
@@ -23,6 +100,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { Sheet } from "@/components/Sheet";
 import { db } from "@/data/db";
+import { SEED_IDS } from "@/data/seed";
 import {
   createCategoryGroupRepository,
   createCategoryRepository,
@@ -30,21 +108,126 @@ import {
 import { categoryGroupSchema, categorySchema } from "@/domain/schemas";
 import type { Category, CategoryGroup } from "@/domain/types";
 
-const iconOptions: readonly { key: string; label: string; icon: LucideIcon }[] = [
-  { key: "ellipsis", label: "Other", icon: Ellipsis },
-  { key: "utensils", label: "Food", icon: Utensils },
-  { key: "basket", label: "Shopping", icon: ShoppingBasket },
-  { key: "home", label: "Home", icon: Home },
-  { key: "car", label: "Transport", icon: Car },
-  { key: "heart", label: "Health", icon: HeartPulse },
-  { key: "education", label: "Education", icon: GraduationCap },
-  { key: "gift", label: "Gifts", icon: Gift },
-  { key: "briefcase", label: "Work", icon: Briefcase },
-  { key: "percent", label: "Interest", icon: Percent },
-  { key: "receipt", label: "Tax", icon: Receipt },
-];
+const iconOptions: readonly { key: string; label: string; icon: LucideIcon }[] =
+  [
+    // General
+    { key: "ellipsis", label: "Other", icon: Ellipsis },
+    { key: "tag", label: "Category", icon: Tag },
+    { key: "star", label: "Favorite", icon: Star },
+    { key: "bookmark", label: "Bookmark", icon: Bookmark },
+    { key: "calendar", label: "Calendar", icon: Calendar },
+    { key: "globe", label: "General", icon: Globe },
 
-const iconByKey = new Map(iconOptions.map((option) => [option.key, option.icon]));
+    // Food & Dining
+    { key: "utensils", label: "Food", icon: Utensils },
+    { key: "basket", label: "Shopping Basket", icon: ShoppingBasket },
+    { key: "coffee", label: "Coffee", icon: Coffee },
+    { key: "pizza", label: "Pizza", icon: Pizza },
+    { key: "apple", label: "Groceries", icon: Apple },
+    { key: "cake", label: "Bakery", icon: Cake },
+    { key: "cookie", label: "Snacks", icon: Cookie },
+
+    // Housing
+    { key: "home", label: "Home", icon: Home },
+    { key: "houses", label: "Houses", icon: Houses },
+    { key: "building", label: "Building", icon: Building2 },
+    {
+      key: "house-arrow-right",
+      label: "House Arrow Right",
+      icon: HouseArrowRight,
+    },
+    { key: "hotel", label: "Hotel", icon: Hotel },
+    { key: "bed", label: "Bedroom", icon: BedDouble },
+    { key: "sofa", label: "Furniture", icon: Sofa },
+    { key: "lamp", label: "Home Supplies", icon: Lamp },
+    { key: "key", label: "Rent", icon: Key },
+    { key: "hammer", label: "Maintenance", icon: Hammer },
+    { key: "armchair", label: "Armchair", icon: Armchair },
+    { key: "palmtree", label: "Palmtree", icon: Palmtree },
+
+    // Transportation
+    { key: "car", label: "Transport", icon: Car },
+    { key: "car-taxi-front", label: "Car Taxi Front", icon: CarTaxiFront },
+    { key: "bike", label: "Bicycle", icon: Bike },
+    { key: "bus", label: "Bus", icon: Bus },
+    { key: "train", label: "Train", icon: Train },
+    { key: "plane", label: "Flights", icon: Plane },
+    { key: "fuel", label: "Fuel", icon: Fuel },
+    { key: "map", label: "Travel", icon: MapIcon },
+    { key: "wrench", label: "Vehicle Maintenance", icon: Wrench },
+
+    // Bills & Utilities
+    { key: "zap", label: "Electricity", icon: Zap },
+    { key: "droplets", label: "Water", icon: Droplets },
+    { key: "wifi", label: "Internet", icon: Wifi },
+    { key: "smartphone", label: "Mobile", icon: Smartphone },
+    { key: "flame", label: "Gas", icon: Flame },
+    { key: "monitor", label: "Electronics", icon: Monitor },
+
+    // Health & Fitness
+    { key: "heart", label: "Health", icon: HeartPulse },
+    { key: "pill", label: "Medicine", icon: Pill },
+    { key: "hospital", label: "Hospital", icon: Hospital },
+    { key: "stethoscope", label: "Doctor", icon: Stethoscope },
+    { key: "dumbbell", label: "Fitness", icon: Dumbbell },
+    { key: "activity", label: "Wellness", icon: Activity },
+
+    // Shopping & Personal
+    { key: "shirt", label: "Clothing", icon: Shirt },
+    { key: "shopping-bag", label: "Shopping", icon: ShoppingBag },
+    { key: "watch", label: "Accessories", icon: Watch },
+    { key: "user-round", label: "Personal Care", icon: UserRound },
+    { key: "baby", label: "Childcare", icon: Baby },
+    { key: "paw-print", label: "Pets", icon: PawPrint },
+    { key: "users", label: "Family", icon: Users },
+    { key: "laptop", label: "Laptop", icon: Laptop },
+    { key: "monitor-pc", label: "Monitor PC", icon: MonitorPc },
+    { key: "monitor-cloud", label: "Monitor Cloud", icon: MonitorCloud },
+
+    // Education & Entertainment
+    { key: "education", label: "Education", icon: GraduationCap },
+    { key: "book", label: "Books", icon: BookOpen },
+    { key: "presentation", label: "Courses", icon: Presentation },
+    { key: "clapperboard", label: "Movies", icon: Clapperboard },
+    { key: "gamepad", label: "Games", icon: Gamepad2 },
+    { key: "monitor-play", label: "Subscriptions", icon: MonitorPlay },
+    { key: "palette", label: "Hobbies", icon: Palette },
+    { key: "music", label: "Music", icon: Music },
+    { key: "ball-wave", label: "Ball Wave", icon: BallWave },
+
+    // Income & Employment
+    { key: "briefcase", label: "Work", icon: Briefcase },
+    { key: "briefcase-business", label: "Salary", icon: BriefcaseBusiness },
+    { key: "wallet", label: "Allowances", icon: Wallet },
+    { key: "award", label: "Bonus", icon: Award },
+    { key: "store", label: "Business", icon: Store },
+    { key: "handshake", label: "Consulting", icon: Handshake },
+    { key: "trophy", label: "Rewards", icon: Trophy },
+
+    // Investments & Banking
+    { key: "landmark", label: "Bank", icon: Landmark },
+    { key: "banknote", label: "Cash", icon: Banknote },
+    { key: "coins", label: "Savings", icon: Coins },
+    { key: "credit-card", label: "Card", icon: CreditCard },
+    { key: "piggy-bank", label: "Savings Bank", icon: PiggyBank },
+    { key: "percent", label: "Interest", icon: Percent },
+    { key: "chart", label: "Investments", icon: ChartNoAxesCombined },
+    { key: "trending-up", label: "Capital Gains", icon: TrendingUp },
+    { key: "hand-coins", label: "Loans", icon: HandCoins },
+
+    // Tax, Gifts & Donations
+    { key: "receipt", label: "Tax", icon: Receipt },
+    { key: "badge-percent", label: "Cashback", icon: BadgePercent },
+    { key: "gift", label: "Gifts", icon: Gift },
+    { key: "heart-handshake", label: "Charity", icon: HeartHandshake },
+    { key: "hand-heart", label: "Donations", icon: HandHeart },
+    { key: "undo", label: "Refunds", icon: Undo2 },
+    { key: "shield-check", label: "Shield Check", icon: ShieldCheck },
+  ];
+
+const iconByKey = new Map(
+  iconOptions.map((option) => [option.key, option.icon]),
+);
 
 type GroupKind = "expense" | "income";
 type GroupFormValues = { name: string; kind: GroupKind };
@@ -79,13 +262,22 @@ export function CategoriesScreen() {
   const [deleteError, setDeleteError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const data = useLiveQuery(
-    async () => ({
-      groups: await groupRepository.list(),
-      categories: await categoryRepository.list(),
-    }),
-    [],
-  );
+  const data = useLiveQuery(async () => {
+    try {
+      return {
+        groups: await groupRepository.list(),
+        categories: await categoryRepository.list(),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        groups: null,
+        categories: null,
+        error:
+          error instanceof Error ? error.message : "Unable to load categories",
+      };
+    }
+  }, []);
   const groups = useMemo(() => data?.groups ?? [], [data]);
   const categories = useMemo(() => data?.categories ?? [], [data]);
 
@@ -148,13 +340,17 @@ export function CategoriesScreen() {
       }
       setGroupSheetOpen(false);
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to save group");
+      setFormError(
+        error instanceof Error ? error.message : "Unable to save group",
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  async function saveCategory(event: FormEvent<HTMLFormElement>): Promise<void> {
+  async function saveCategory(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     event.preventDefault();
     setSaving(true);
     setFormError("");
@@ -191,7 +387,9 @@ export function CategoriesScreen() {
       await groupRepository.softDelete(deletingGroup.id);
       setDeletingGroup(undefined);
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : "Unable to delete group");
+      setDeleteError(
+        error instanceof Error ? error.message : "Unable to delete group",
+      );
     }
   }
 
@@ -215,56 +413,125 @@ export function CategoriesScreen() {
 
   return (
     <section className="mx-auto w-full max-w-5xl">
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <FolderTree className="h-6 w-6 text-blue-600" />
           <h1 className="text-2xl font-semibold">Categories</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={openCreateGroup}>Add group</Button>
+          <Button variant="secondary" onClick={openCreateGroup}>
+            Add group
+          </Button>
           <Button onClick={openCreateCategory}>Add category</Button>
         </div>
       </div>
 
       {data === undefined ? (
-        <p role="status" className="text-sm text-gray-600">Loading categories...</p>
+        <p role="status" className="text-sm text-gray-600">
+          Loading categories...
+        </p>
+      ) : data.error ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
+          Unable to load categories: {data.error}
+        </p>
       ) : groups.length === 0 && categories.length === 0 ? (
-        <EmptyState title="No categories yet" description="Create a category group and category." action={<Button onClick={openCreateGroup}>Create group</Button>} />
+        <EmptyState
+          title="No categories yet"
+          description="Create a category group and category."
+          action={<Button onClick={openCreateGroup}>Create group</Button>}
+        />
       ) : (
         categoryGroups.map(({ kind, groups: matchingGroups }) => (
           <section key={kind} className="mb-8">
             <h2 className="mb-3 text-lg font-semibold capitalize">{kind}</h2>
             {matchingGroups.length === 0 ? (
-              <p className="text-sm text-gray-600 dark:text-gray-300">No {kind} groups.</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                No {kind} groups.
+              </p>
             ) : (
               <div className="space-y-4">
                 {matchingGroups.map((group) => (
-                  <article key={group.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                  <article
+                    key={group.id}
+                    className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+                  >
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <h3 className="font-medium">{group.name}</h3>
-                      <div className="flex gap-2">
-                        <Button variant="secondary" onClick={() => openEditGroup(group)} aria-label={`Edit group ${group.name}`} className="px-3"><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="danger" onClick={() => { setDeletingGroup(group); setDeleteError(""); }} aria-label={`Delete group ${group.name}`} className="px-3"><Trash2 className="h-4 w-4" /></Button>
-                      </div>
+                      {group.id === SEED_IDS.expenseOtherGroup ||
+                      group.id === SEED_IDS.incomeOtherGroup ? (
+                        <span className="text-xs text-gray-500">Built-in</span>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="secondary"
+                            onClick={() => openEditGroup(group)}
+                            aria-label={`Edit group ${group.name}`}
+                            className="px-3"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => {
+                              setDeletingGroup(group);
+                              setDeleteError("");
+                            }}
+                            aria-label={`Delete group ${group.name}`}
+                            className="px-3"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
-                      {categories.filter((category) => category.groupId === group.id).map((category) => {
-                        const Icon = iconByKey.get(category.icon) ?? Ellipsis;
-                        return (
-                          <div key={category.id} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-800">
-                            <Icon className="h-5 w-5 text-blue-600" aria-hidden="true" />
-                            <span className="flex-1">{category.name}</span>
-                            {category.builtIn ? (
-                              <span className="text-xs text-gray-500">Built-in</span>
-                            ) : (
-                              <>
-                                <Button variant="secondary" onClick={() => openEditCategory(category)} aria-label={`Edit ${category.name}`} className="px-3"><Pencil className="h-4 w-4" /></Button>
-                                <Button variant="danger" onClick={() => { setDeletingCategory(category); setDeleteError(""); }} aria-label={`Delete ${category.name}`} className="px-3"><Trash2 className="h-4 w-4" /></Button>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {categories
+                        .filter((category) => category.groupId === group.id)
+                        .map((category) => {
+                          const Icon = iconByKey.get(category.icon) ?? Ellipsis;
+                          return (
+                            <div
+                              key={category.id}
+                              className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-800"
+                            >
+                              <Icon
+                                className="h-5 w-5 text-blue-600"
+                                aria-hidden="true"
+                              />
+                              <span className="flex-1">{category.name}</span>
+                              {category.builtIn ? (
+                                <span className="text-xs text-gray-500">
+                                  Built-in
+                                </span>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="secondary"
+                                    onClick={() => openEditCategory(category)}
+                                    aria-label={`Edit ${category.name}`}
+                                    className="px-3"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="danger"
+                                    onClick={() => {
+                                      setDeletingCategory(category);
+                                      setDeleteError("");
+                                    }}
+                                    aria-label={`Delete ${category.name}`}
+                                    className="px-3"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
                     </div>
                   </article>
                 ))}
@@ -274,40 +541,118 @@ export function CategoriesScreen() {
         ))
       )}
 
-      <Sheet open={groupSheetOpen} title={editingGroup ? "Edit category group" : "Add category group"} onClose={() => setGroupSheetOpen(false)}>
+      <Sheet
+        open={groupSheetOpen}
+        title={editingGroup ? "Edit category group" : "Add category group"}
+        onClose={() => setGroupSheetOpen(false)}
+      >
         <form onSubmit={saveGroup} noValidate>
-          <label className="block text-sm font-medium">Name
-            <input value={groupForm.name} onChange={(event) => setGroupForm((current) => ({ ...current, name: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900" />
+          <label className="block text-sm font-medium">
+            Name
+            <input
+              value={groupForm.name}
+              onChange={(event) =>
+                setGroupForm((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"
+            />
           </label>
-          <label className="mt-4 block text-sm font-medium">Kind
-            <select value={groupForm.kind} onChange={(event) => setGroupForm((current) => ({ ...current, kind: event.target.value as GroupKind }))} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900">
+          <label className="mt-4 block text-sm font-medium">
+            Kind
+            <select
+              value={groupForm.kind}
+              onChange={(event) =>
+                setGroupForm((current) => ({
+                  ...current,
+                  kind: event.target.value as GroupKind,
+                }))
+              }
+              className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"
+            >
               <option value="expense">Expense</option>
               <option value="income">Income</option>
             </select>
           </label>
-          {formError ? <p role="alert" className="mt-4 text-sm text-red-600">{formError}</p> : null}
-          <div className="mt-6 flex justify-end gap-3"><Button variant="secondary" onClick={() => setGroupSheetOpen(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button></div>
+          {formError ? (
+            <p role="alert" className="mt-4 text-sm text-red-600">
+              {formError}
+            </p>
+          ) : null}
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setGroupSheetOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </div>
         </form>
       </Sheet>
 
-      <Sheet open={categorySheetOpen} title={editingCategory ? "Edit category" : "Add category"} onClose={() => setCategorySheetOpen(false)}>
+      <Sheet
+        open={categorySheetOpen}
+        title={editingCategory ? "Edit category" : "Add category"}
+        onClose={() => setCategorySheetOpen(false)}
+      >
         <form onSubmit={saveCategory} noValidate>
-          <label className="block text-sm font-medium">Name
-            <input value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900" />
+          <label className="block text-sm font-medium">
+            Name
+            <input
+              value={categoryForm.name}
+              onChange={(event) =>
+                setCategoryForm((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"
+            />
           </label>
-          <label className="mt-4 block text-sm font-medium">Kind
-            <select value={categoryForm.kind} onChange={(event) => {
-              const kind = event.target.value as GroupKind;
-              const first = groups.find((group) => group.kind === kind);
-              setCategoryForm((current) => ({ ...current, kind, groupId: first?.id ?? "" }));
-            }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900">
+          <label className="mt-4 block text-sm font-medium">
+            Kind
+            <select
+              value={categoryForm.kind}
+              onChange={(event) => {
+                const kind = event.target.value as GroupKind;
+                const first = groups.find((group) => group.kind === kind);
+                setCategoryForm((current) => ({
+                  ...current,
+                  kind,
+                  groupId: first?.id ?? "",
+                }));
+              }}
+              className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"
+            >
               <option value="expense">Expense</option>
               <option value="income">Income</option>
             </select>
           </label>
-          <label className="mt-4 block text-sm font-medium">Group
-            <select value={categoryForm.groupId} onChange={(event) => setCategoryForm((current) => ({ ...current, groupId: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900">
-              {groups.filter((group) => group.kind === categoryForm.kind).map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+          <label className="mt-4 block text-sm font-medium">
+            Group
+            <select
+              value={categoryForm.groupId}
+              onChange={(event) =>
+                setCategoryForm((current) => ({
+                  ...current,
+                  groupId: event.target.value,
+                }))
+              }
+              className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"
+            >
+              {groups
+                .filter((group) => group.kind === categoryForm.kind)
+                .map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
             </select>
           </label>
           <fieldset className="mt-4">
@@ -315,17 +660,74 @@ export function CategoriesScreen() {
             <div className="mt-2 grid grid-cols-4 gap-2">
               {iconOptions.map((option) => {
                 const Icon = option.icon;
-                return <button key={option.key} type="button" aria-label={option.label} aria-pressed={categoryForm.icon === option.key} onClick={() => setCategoryForm((current) => ({ ...current, icon: option.key }))} className={`flex min-h-11 items-center justify-center rounded-lg border ${categoryForm.icon === option.key ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-300 text-gray-700 dark:border-gray-700 dark:text-gray-300"}`}><Icon className="h-5 w-5" /></button>;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    aria-label={option.label}
+                    aria-pressed={categoryForm.icon === option.key}
+                    onClick={() =>
+                      setCategoryForm((current) => ({
+                        ...current,
+                        icon: option.key,
+                      }))
+                    }
+                    className={`flex min-h-11 items-center justify-center rounded-lg border ${categoryForm.icon === option.key ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-300 text-gray-700 dark:border-gray-700 dark:text-gray-300"}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </button>
+                );
               })}
             </div>
           </fieldset>
-          {formError ? <p role="alert" className="mt-4 text-sm text-red-600">{formError}</p> : null}
-          <div className="mt-6 flex justify-end gap-3"><Button variant="secondary" onClick={() => setCategorySheetOpen(false)} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button></div>
+          {formError ? (
+            <p role="alert" className="mt-4 text-sm text-red-600">
+              {formError}
+            </p>
+          ) : null}
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setCategorySheetOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </div>
         </form>
       </Sheet>
 
-      <ConfirmDialog open={deletingGroup !== undefined} title={`Delete ${deletingGroup?.name ?? "group"}?`} description={deleteError || "This group will be moved to trash. It can only be deleted when it has no categories."} confirmLabel="Delete" onConfirm={() => void deleteGroup()} onCancel={() => { setDeletingGroup(undefined); setDeleteError(""); }} />
-      <ConfirmDialog open={deletingCategory !== undefined} title={`Delete ${deletingCategory?.name ?? "category"}?`} description={deleteError || "Transactions using this category will be reassigned to Other."} confirmLabel="Delete" onConfirm={() => void deleteCategory()} onCancel={() => { setDeletingCategory(undefined); setDeleteError(""); }} />
+      <ConfirmDialog
+        open={deletingGroup !== undefined}
+        title={`Delete ${deletingGroup?.name ?? "group"}?`}
+        description={
+          deleteError ||
+          "This group will be moved to trash. It can only be deleted when it has no categories."
+        }
+        confirmLabel="Delete"
+        onConfirm={() => void deleteGroup()}
+        onCancel={() => {
+          setDeletingGroup(undefined);
+          setDeleteError("");
+        }}
+      />
+      <ConfirmDialog
+        open={deletingCategory !== undefined}
+        title={`Delete ${deletingCategory?.name ?? "category"}?`}
+        description={
+          deleteError ||
+          `Transactions using this category will be reassigned to ${deletingCategory?.kind === "income" ? "Income" : "Expense"} Other.`
+        }
+        confirmLabel="Delete"
+        onConfirm={() => void deleteCategory()}
+        onCancel={() => {
+          setDeletingCategory(undefined);
+          setDeleteError("");
+        }}
+      />
     </section>
   );
 }

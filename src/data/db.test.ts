@@ -13,7 +13,7 @@ import {
   ensureDatabaseReady,
   type LocaledgerDatabase,
 } from "@/data/db";
-import { seedDefaults } from "@/data/seed";
+import { SEED_IDS, seedDefaults } from "@/data/seed";
 import { toPaise } from "@/domain/money";
 
 const databases: LocaledgerDatabase[] = [];
@@ -58,6 +58,35 @@ describe("Localedger IndexedDB foundation", () => {
       key: "schema",
       version: 1,
     });
+    await legacy.table("categoryGroups").bulkPut([
+      {
+        id: SEED_IDS.expenseGroup,
+        createdAt: "2026-11-26T10:00:00.000Z",
+        updatedAt: "2026-11-26T10:00:00.000Z",
+        deleted: false,
+        name: "Expenses",
+        kind: "expense",
+      },
+      {
+        id: SEED_IDS.incomeGroup,
+        createdAt: "2026-11-26T10:00:00.000Z",
+        updatedAt: "2026-11-26T10:00:00.000Z",
+        deleted: false,
+        name: "Income",
+        kind: "income",
+      },
+    ]);
+    await legacy.table("categories").put({
+      id: SEED_IDS.other,
+      createdAt: "2026-11-26T10:00:00.000Z",
+      updatedAt: "2026-11-26T10:00:00.000Z",
+      deleted: false,
+      name: "Other",
+      icon: "ellipsis",
+      groupId: SEED_IDS.expenseGroup,
+      kind: "expense",
+      builtIn: true,
+    });
     await legacy.table("accounts").put({
       id: "40000000-0000-4000-8000-000000000001",
       createdAt: "2026-11-26T10:00:00.000Z",
@@ -84,6 +113,16 @@ describe("Localedger IndexedDB foundation", () => {
       startingBalance: toPaise(12500),
     });
     expect(await database.backupSnapshots.count()).toBe(0);
+    expect(await database.categories.get(SEED_IDS.other)).toMatchObject({
+      groupId: SEED_IDS.expenseOtherGroup,
+      kind: "expense",
+      builtIn: true,
+    });
+    expect(await database.categories.get(SEED_IDS.incomeOther)).toMatchObject({
+      groupId: SEED_IDS.incomeOtherGroup,
+      kind: "income",
+      builtIn: true,
+    });
   });
 
   it("initializes a fresh database and seeds defaults", async () => {
@@ -95,16 +134,36 @@ describe("Localedger IndexedDB foundation", () => {
       key: "schema",
       version: LOCAL_SCHEMA_VERSION,
     });
-    expect(await database.categoryGroups.count()).toBe(2);
-    expect(await database.categories.count()).toBe(3);
+    expect(await database.categoryGroups.count()).toBe(4);
+    expect(await database.categories.count()).toBe(4);
     expect(await database.payees.count()).toBe(1);
 
-    const other = await database.categories
-      .where("name")
-      .equals("Other")
-      .first();
-    expect(other).toMatchObject({
+    expect(await database.categories.get(SEED_IDS.other)).toMatchObject({
       builtIn: true,
+      deleted: false,
+      name: "Other",
+      kind: "expense",
+      groupId: SEED_IDS.expenseOtherGroup,
+    });
+    expect(
+      await database.categoryGroups.get(SEED_IDS.expenseOtherGroup),
+    ).toMatchObject({
+      name: "Other",
+      kind: "expense",
+      deleted: false,
+    });
+    expect(await database.categories.get(SEED_IDS.incomeOther)).toMatchObject({
+      builtIn: true,
+      deleted: false,
+      name: "Other",
+      kind: "income",
+      groupId: SEED_IDS.incomeOtherGroup,
+    });
+    expect(
+      await database.categoryGroups.get(SEED_IDS.incomeOtherGroup),
+    ).toMatchObject({
+      name: "Other",
+      kind: "income",
       deleted: false,
     });
 
@@ -124,8 +183,8 @@ describe("Localedger IndexedDB foundation", () => {
 
     await seedDefaults(database, new Date("2027-01-01T00:00:00.000Z"));
 
-    expect(await database.categoryGroups.count()).toBe(2);
-    expect(await database.categories.count()).toBe(3);
+    expect(await database.categoryGroups.count()).toBe(4);
+    expect(await database.categories.count()).toBe(4);
     expect(await database.payees.count()).toBe(1);
   });
 
@@ -153,11 +212,14 @@ describe("Localedger IndexedDB foundation", () => {
       groups: [
         "10000000-0000-4000-8000-000000000001",
         "10000000-0000-4000-8000-000000000002",
+        "10000000-0000-4000-8000-000000000003",
+        "10000000-0000-4000-8000-000000000004",
       ],
       categories: [
         "20000000-0000-4000-8000-000000000001",
         "20000000-0000-4000-8000-000000000002",
         "20000000-0000-4000-8000-000000000003",
+        "20000000-0000-4000-8000-000000000004",
       ],
       payees: ["30000000-0000-4000-8000-000000000001"],
     });
@@ -177,6 +239,35 @@ describe("Localedger IndexedDB foundation", () => {
     const database = createNamedDatabase("localedger-v0-migration");
     await database.open();
     await database.metadata.put(fixture);
+    await database.categoryGroups.bulkPut([
+      {
+        id: SEED_IDS.expenseGroup,
+        createdAt: "2026-11-26T10:00:00.000Z",
+        updatedAt: "2026-11-26T10:00:00.000Z",
+        deleted: false,
+        name: "Expenses",
+        kind: "expense",
+      },
+      {
+        id: SEED_IDS.incomeGroup,
+        createdAt: "2026-11-26T10:00:00.000Z",
+        updatedAt: "2026-11-26T10:00:00.000Z",
+        deleted: false,
+        name: "Income",
+        kind: "income",
+      },
+    ]);
+    await database.categories.put({
+      id: SEED_IDS.other,
+      createdAt: "2026-11-26T10:00:00.000Z",
+      updatedAt: "2026-11-26T10:00:00.000Z",
+      deleted: false,
+      name: "Other",
+      icon: "ellipsis",
+      groupId: SEED_IDS.expenseGroup,
+      kind: "expense",
+      builtIn: true,
+    });
     await database.accounts.put({
       id: "40000000-0000-4000-8000-000000000001",
       createdAt: "2026-11-26T10:00:00.000Z",

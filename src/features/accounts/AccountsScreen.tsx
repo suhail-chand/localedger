@@ -12,11 +12,16 @@ import {
   createAccountRepository,
   createTransactionRepository,
 } from "@/data/repositories";
-import { calculateAccountBalances, calculateNetWorth } from "@/domain/balances";
+import {
+  calculateAccountBalances,
+  calculateAccountTypeBalances,
+  calculateBalanceSheetSummary,
+} from "@/domain/balances";
 import {
   formatPaise,
   paiseFromRupees,
   paiseToRupeesString,
+  toPaise,
 } from "@/domain/money";
 import { accountSchema } from "@/domain/schemas";
 import type { Account, AccountType } from "@/domain/types";
@@ -66,7 +71,7 @@ function localDateInputValue(date: Date = new Date()): string {
 }
 
 function utcDateValue(date: string): string {
-  return new Date(`${date}T00:00:00`).toISOString();
+  return new Date(`${date}T00:00:00.000Z`).toISOString();
 }
 
 function toFormValues(account?: Account): AccountFormValues {
@@ -100,13 +105,22 @@ export function AccountsScreen() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AccountFormValues>(() => toFormValues());
 
-  const data = useLiveQuery(
-    async () => ({
-      accounts: await accountRepository.list(),
-      transactions: await transactionRepository.list(),
-    }),
-    [],
-  );
+  const data = useLiveQuery(async () => {
+    try {
+      return {
+        accounts: await accountRepository.list(),
+        transactions: await transactionRepository.list(),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        accounts: null,
+        transactions: null,
+        error:
+          error instanceof Error ? error.message : "Unable to load accounts",
+      };
+    }
+  }, []);
 
   const accounts = useMemo(() => data?.accounts ?? [], [data]);
   const transactions = useMemo(() => data?.transactions ?? [], [data]);
@@ -118,6 +132,20 @@ export function AccountsScreen() {
           entry.balance,
         ]),
       ),
+    [accounts, transactions],
+  );
+  const accountTypeBalances = useMemo(
+    () =>
+      new Map(
+        calculateAccountTypeBalances(accounts, transactions).map((entry) => [
+          entry.accountType,
+          entry.balance,
+        ]),
+      ),
+    [accounts, transactions],
+  );
+  const balanceSheetSummary = useMemo(
+    () => calculateBalanceSheetSummary(accounts, transactions),
     [accounts, transactions],
   );
 
@@ -187,8 +215,6 @@ export function AccountsScreen() {
     }
   }
 
-  const netWorth = calculateNetWorth(accounts, transactions);
-
   return (
     <section className="mx-auto w-full max-w-5xl">
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -203,6 +229,13 @@ export function AccountsScreen() {
         <p role="status" className="text-sm text-gray-600">
           Loading accounts...
         </p>
+      ) : data.error ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
+          Unable to load accounts: {data.error}
+        </p>
       ) : accounts.length === 0 ? (
         <EmptyState
           title="No accounts yet"
@@ -211,25 +244,56 @@ export function AccountsScreen() {
         />
       ) : (
         <>
-          <div className="mb-6 grid gap-3 sm:grid-cols-2">
+          <div className="mb-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Total assets
+              </p>
+              <p className="mt-1 text-xl font-semibold">
+                {formatPaise(balanceSheetSummary.assets, "none")}
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Total liabilities
+              </p>
+              <p className="mt-1 text-xl font-semibold">
+                {formatPaise(balanceSheetSummary.liabilities, "none")}
+              </p>
+            </div>
             <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
               <p className="text-sm text-gray-600 dark:text-gray-300">
                 Net worth
               </p>
-              <p className="mt-1 text-2xl font-semibold">
-                {formatPaise(netWorth)}
+              <p className="mt-1 text-xl font-semibold">
+                {formatPaise(balanceSheetSummary.netWorth)}
               </p>
             </div>
           </div>
 
           {accountTypes.map((type) => {
-            const matching = accounts.filter((account) => account.type === type);
+            const matching = accounts.filter(
+              (account) => account.type === type,
+            );
             if (matching.length === 0) return null;
             return (
               <section key={type} className="mb-6">
-                <h2 className="mb-3 text-lg font-semibold">
-                  {accountTypeLabels[type]}
-                </h2>
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <h2 className="text-lg font-semibold">
+                    {accountTypeLabels[type]}
+                  </h2>
+                  {matching.some((account) => !account.hideFromReports) ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Total{" "}
+                      <span className="ml-1 font-semibold text-gray-900 dark:text-gray-100">
+                        {formatPaise(
+                          accountTypeBalances.get(type) ?? toPaise(0),
+                          "always",
+                        )}
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
                 <div className="space-y-2">
                   {matching.map((account) => (
                     <article
@@ -248,7 +312,7 @@ export function AccountsScreen() {
                         {formatPaise(
                           balanceById.get(account.id) ??
                             account.startingBalance,
-                          "none",
+                          "always",
                         )}
                       </p>
                       <Button

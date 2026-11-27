@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 // Dexie versions describe IndexedDB table/index structure. LOCAL_SCHEMA_VERSION
-// describes validated record shapes and changes only when record data needs a
-// forward migration. The two version values may therefore advance independently.
-export const LOCAL_SCHEMA_VERSION = 1;
+// describes validated record data and default changes requiring a forward
+// migration. The two version values may therefore advance independently.
+export const LOCAL_SCHEMA_VERSION = 2;
 
 export const schemaMetadataSchema = z
   .object({

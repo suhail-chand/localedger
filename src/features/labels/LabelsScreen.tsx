@@ -29,8 +29,17 @@ export function LabelsScreen() {
   const [deleteError, setDeleteError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const labels = useLiveQuery(() => repository.list(), []);
-  const visibleLabels = useMemo(() => labels ?? [], [labels]);
+  const labels = useLiveQuery(async () => {
+    try {
+      return { labels: await repository.list(), error: null };
+    } catch (error) {
+      return {
+        labels: null,
+        error: error instanceof Error ? error.message : "Unable to load labels",
+      };
+    }
+  }, []);
+  const visibleLabels = useMemo(() => labels?.labels ?? [], [labels]);
 
   function openCreate(): void {
     setEditingLabel(undefined);
@@ -98,6 +107,13 @@ export function LabelsScreen() {
       {labels === undefined ? (
         <p role="status" className="text-sm text-gray-600">
           Loading labels...
+        </p>
+      ) : labels.error ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
+          Unable to load labels: {labels.error}
         </p>
       ) : visibleLabels.length === 0 ? (
         <EmptyState

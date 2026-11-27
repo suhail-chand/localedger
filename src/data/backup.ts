@@ -45,6 +45,74 @@ export const backupDocumentSchema = z
 
 export type BackupDocument = z.infer<typeof backupDocumentSchema>;
 
+function migrateCategoryFallbacks(document: BackupDocument): BackupDocument {
+  if (document.schemaVersion !== 1) {
+    return document;
+  }
+
+  const reservedIds = [
+    SEED_IDS.expenseOtherGroup,
+    SEED_IDS.incomeOtherGroup,
+    SEED_IDS.incomeOther,
+  ];
+  const existingIds = new Set([
+    ...document.data.categoryGroups.map((record) => record.id),
+    ...document.data.categories.map((record) => record.id),
+  ]);
+  if (reservedIds.some((id) => existingIds.has(id))) {
+    throw new Error("Backup uses a reserved built-in category ID");
+  }
+
+  const fallbackGroups = [
+    {
+      id: SEED_IDS.expenseOtherGroup,
+      createdAt: document.exportedAt,
+      updatedAt: document.exportedAt,
+      deleted: false,
+      name: "Other",
+      kind: "expense" as const,
+    },
+    {
+      id: SEED_IDS.incomeOtherGroup,
+      createdAt: document.exportedAt,
+      updatedAt: document.exportedAt,
+      deleted: false,
+      name: "Other",
+      kind: "income" as const,
+    },
+  ];
+  const categories = document.data.categories.map((category) =>
+    category.id === SEED_IDS.other
+      ? {
+          ...category,
+          groupId: SEED_IDS.expenseOtherGroup,
+          updatedAt: document.exportedAt,
+        }
+      : category,
+  );
+  categories.push({
+    id: SEED_IDS.incomeOther,
+    createdAt: document.exportedAt,
+    updatedAt: document.exportedAt,
+    deleted: false,
+    name: "Other",
+    icon: "ellipsis",
+    groupId: SEED_IDS.incomeOtherGroup,
+    kind: "income",
+    builtIn: true,
+  });
+
+  return backupDocumentSchema.parse({
+    ...document,
+    schemaVersion: 2,
+    data: {
+      ...document.data,
+      categoryGroups: [...document.data.categoryGroups, ...fallbackGroups],
+      categories,
+    },
+  });
+}
+
 export type BackupIntegrityKind =
   | "splitAccount"
   | "splitCategory"
@@ -175,11 +243,34 @@ function validateBackupReferentialIntegrity(document: BackupDocument): void {
     }
   }
 
-  const other = document.data.categories.find(
-    (record) => record.id === SEED_IDS.other,
-  );
-  if (!other || other.deleted || !other.builtIn) {
-    add("builtInCategory", SEED_IDS.other);
+  for (const fallback of [
+    {
+      id: SEED_IDS.other,
+      groupId: SEED_IDS.expenseOtherGroup,
+      kind: "expense",
+    },
+    {
+      id: SEED_IDS.incomeOther,
+      groupId: SEED_IDS.incomeOtherGroup,
+      kind: "income",
+    },
+  ] as const) {
+    const category = categoryById.get(fallback.id);
+    const group = categoryGroupById.get(fallback.groupId);
+    if (
+      !category ||
+      category.deleted ||
+      category.builtIn !== true ||
+      category.name !== "Other" ||
+      category.kind !== fallback.kind ||
+      category.groupId !== fallback.groupId ||
+      !group ||
+      group.deleted ||
+      group.name !== "Other" ||
+      group.kind !== fallback.kind
+    ) {
+      add("builtInCategory", fallback.id);
+    }
   }
   const unspecified = document.data.payees.find(
     (record) => record.id === SEED_IDS.unspecified,
@@ -376,8 +467,10 @@ export function parseBackupJson(json: string): BackupDocument {
     throw new Error("Backup JSON is invalid");
   }
 
-  const document = backupDocumentSchema.parse(parsedJson);
-  assertSupportedSchemaVersion(document.schemaVersion);
+  const parsed = backupDocumentSchema.parse(parsedJson);
+  assertSupportedSchemaVersion(parsed.schemaVersion);
+  validateUniqueIds(parsed);
+  const document = migrateCategoryFallbacks(parsed);
   validateUniqueIds(document);
   validateBackupReferentialIntegrity(document);
   return document;

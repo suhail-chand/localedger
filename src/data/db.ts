@@ -19,7 +19,7 @@ import {
   schemaMetadataSchema,
   type SchemaMetadata,
 } from "@/data/migrations";
-import { seedDefaults } from "@/data/seed";
+import { migrateCategoryFallbacks, seedDefaults } from "@/data/seed";
 import type { DeviceSettings } from "@/data/deviceSettings";
 import {
   accountSchema,
@@ -114,6 +114,11 @@ export async function ensureDatabaseReady(
   assertSupportedSchemaVersion(metadata.version);
   if (metadata.version === 0) {
     await migrateLegacySchema(database);
+    await migrateCategoryFallbacks(database);
+    return;
+  }
+  if (metadata.version === 1) {
+    await migrateCategoryFallbacks(database);
     return;
   }
   if (metadata.version !== LOCAL_SCHEMA_VERSION) {
@@ -165,7 +170,7 @@ async function migrateLegacySchema(
 
       await database.metadata.put({
         key: "schema",
-        version: LOCAL_SCHEMA_VERSION,
+        version: 1,
       } satisfies SchemaMetadata);
     },
   );

@@ -3,6 +3,7 @@ import { SEED_IDS } from "@/data/seed";
 import { toUtcIso } from "@/domain/ids";
 import {
   accountSchema,
+  categoryGroupSchema,
   categorySchema,
   occurrenceRecordSchema,
   payeeSchema,
@@ -10,7 +11,11 @@ import {
   transactionSchema,
 } from "@/domain/schemas";
 import { scanTransactions } from "@/data/transactionScan";
-import { assertAccountNotInUse } from "@/data/referenceIntegrity";
+import {
+  assertAccountNotInUse,
+  assertCategoryKindAvailable,
+} from "@/data/referenceIntegrity";
+import type { Split } from "@/domain/types";
 
 export class BuiltInFallbackError extends Error {
   constructor(kind: "category" | "payee") {
@@ -28,17 +33,50 @@ export class DeletedAccountInUseError extends Error {
 
 async function assertCategoryFallbackAvailable(
   database: LocaledgerDatabase,
-): Promise<void> {
+  kind: "expense" | "income",
+): Promise<string> {
+  const fallbackId = kind === "expense" ? SEED_IDS.other : SEED_IDS.incomeOther;
+  const groupId =
+    kind === "expense" ? SEED_IDS.expenseOtherGroup : SEED_IDS.incomeOtherGroup;
   const fallback = categorySchema.safeParse(
-    await database.categories.get(SEED_IDS.other),
+    await database.categories.get(fallbackId),
+  );
+  const group = categoryGroupSchema.safeParse(
+    await database.categoryGroups.get(groupId),
   );
   if (
     !fallback.success ||
-    fallback.data.id !== SEED_IDS.other ||
+    fallback.data.id !== fallbackId ||
     fallback.data.builtIn !== true ||
-    fallback.data.deleted
+    fallback.data.deleted ||
+    fallback.data.name !== "Other" ||
+    fallback.data.kind !== kind ||
+    fallback.data.groupId !== groupId ||
+    !group.success ||
+    group.data.deleted ||
+    group.data.name !== "Other" ||
+    group.data.kind !== kind
   ) {
     throw new BuiltInFallbackError("category");
+  }
+  return fallbackId;
+}
+
+function categoryFallbackId(kind: "expense" | "income"): string {
+  return kind === "expense" ? SEED_IDS.other : SEED_IDS.incomeOther;
+}
+
+async function assertCategoryKindsAvailable(
+  database: LocaledgerDatabase,
+  splits: readonly Split[],
+): Promise<void> {
+  for (const split of splits) {
+    if (
+      (split.type === "expense" || split.type === "income") &&
+      split.categoryId
+    ) {
+      await assertCategoryKindAvailable(database, split.categoryId, split.type);
+    }
   }
 }
 
@@ -68,6 +106,7 @@ export async function deleteCategoryAndReassign(
     "rw",
     [
       database.categories,
+      database.categoryGroups,
       database.transactions,
       database.scheduledTransactions,
     ],
@@ -80,10 +119,11 @@ export async function deleteCategoryAndReassign(
         throw new Error("Built-in categories cannot be deleted");
       }
 
-      if (fallbackCategoryId !== SEED_IDS.other) {
+      const expectedFallbackId = categoryFallbackId(category.kind);
+      if (fallbackCategoryId !== expectedFallbackId) {
         throw new BuiltInFallbackError("category");
       }
-      await assertCategoryFallbackAvailable(database);
+      await assertCategoryFallbackAvailable(database, category.kind);
 
       const timestamp = toUtcIso(now);
       const deletedCategory = categorySchema.parse({
@@ -105,13 +145,13 @@ export async function deleteCategoryAndReassign(
           return split;
         });
         if (changed) {
-          await database.transactions.put(
-            transactionSchema.parse({
-              ...transaction,
-              splits,
-              updatedAt: timestamp,
-            }),
-          );
+          const updated = transactionSchema.parse({
+            ...transaction,
+            splits,
+            updatedAt: timestamp,
+          });
+          await assertCategoryKindsAvailable(database, updated.splits);
+          await database.transactions.put(updated);
         }
       });
       const schedules = await database.scheduledTransactions.toArray();
@@ -129,13 +169,13 @@ export async function deleteCategoryAndReassign(
           return split;
         });
         if (changed) {
-          await database.scheduledTransactions.put(
-            scheduledTransactionSchema.parse({
-              ...schedule,
-              template: { ...schedule.template, splits },
-              updatedAt: timestamp,
-            }),
-          );
+          const updated = scheduledTransactionSchema.parse({
+            ...schedule,
+            template: { ...schedule.template, splits },
+            updatedAt: timestamp,
+          });
+          await assertCategoryKindsAvailable(database, updated.template.splits);
+          await database.scheduledTransactions.put(updated);
         }
       }
     },
@@ -242,9 +282,18 @@ export async function purgeTrash(
     ],
     async () => {
       const timestamp = toUtcIso(new Date());
-      const deletedCategories = (
+      const deletedCategoryRecords = (
         await database.categories.filter((record) => record.deleted).toArray()
-      ).map((record) => categorySchema.parse(record).id);
+      ).map((record) => categorySchema.parse(record));
+      const deletedCategoryKinds = new Map(
+        deletedCategoryRecords.map(
+          (category) => [category.id, category.kind] as const,
+        ),
+      );
+      const deletedCategories = [...deletedCategoryKinds.keys()];
+      if (deletedCategoryRecords.some((category) => category.builtIn)) {
+        throw new Error("Built-in categories cannot be purged");
+      }
       const deletedPayees = (
         await database.payees.filter((record) => record.deleted).toArray()
       ).map((record) => payeeSchema.parse(record).id);
@@ -263,7 +312,9 @@ export async function purgeTrash(
       }
 
       if (deletedCategories.length > 0) {
-        await assertCategoryFallbackAvailable(database);
+        for (const kind of new Set(deletedCategoryKinds.values())) {
+          await assertCategoryFallbackAvailable(database, kind);
+        }
       }
       if (deletedPayees.length > 0) {
         await assertPayeeFallbackAvailable(database);
@@ -310,21 +361,24 @@ export async function purgeTrash(
             if (
               (split.type === "expense" || split.type === "income") &&
               split.categoryId &&
-              deletedCategories.includes(split.categoryId)
+              deletedCategoryKinds.has(split.categoryId)
             ) {
               changed = true;
-              return { ...split, categoryId: SEED_IDS.other };
+              return {
+                ...split,
+                categoryId: categoryFallbackId(split.type),
+              };
             }
             return split;
           });
           if (changed) {
-            await database.transactions.put(
-              transactionSchema.parse({
-                ...transaction,
-                splits,
-                updatedAt: timestamp,
-              }),
-            );
+            const updated = transactionSchema.parse({
+              ...transaction,
+              splits,
+              updatedAt: timestamp,
+            });
+            await assertCategoryKindsAvailable(database, updated.splits);
+            await database.transactions.put(updated);
           }
         });
         const schedules = await database.scheduledTransactions.toArray();
@@ -335,21 +389,27 @@ export async function purgeTrash(
             if (
               (split.type === "expense" || split.type === "income") &&
               split.categoryId &&
-              deletedCategories.includes(split.categoryId)
+              deletedCategoryKinds.has(split.categoryId)
             ) {
               changed = true;
-              return { ...split, categoryId: SEED_IDS.other };
+              return {
+                ...split,
+                categoryId: categoryFallbackId(split.type),
+              };
             }
             return split;
           });
           if (changed) {
-            await database.scheduledTransactions.put(
-              scheduledTransactionSchema.parse({
-                ...schedule,
-                template: { ...schedule.template, splits },
-                updatedAt: timestamp,
-              }),
+            const updated = scheduledTransactionSchema.parse({
+              ...schedule,
+              template: { ...schedule.template, splits },
+              updatedAt: timestamp,
+            });
+            await assertCategoryKindsAvailable(
+              database,
+              updated.template.splits,
             );
+            await database.scheduledTransactions.put(updated);
           }
         }
       }

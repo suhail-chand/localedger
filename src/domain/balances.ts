@@ -1,10 +1,38 @@
-import type { Account, Paise, Transaction } from "@/domain/types";
+import { format } from "date-fns";
+
+import type { Account, AccountType, Paise, Transaction } from "@/domain/types";
 import { toPaise } from "@/domain/money";
 
 export interface AccountBalance {
   accountId: string;
   balance: Paise;
 }
+
+export interface AccountTypeBalance {
+  accountType: AccountType;
+  balance: Paise;
+}
+
+export interface BalanceSheetSummary {
+  assets: Paise;
+  liabilities: Paise;
+  netWorth: Paise;
+}
+
+const assetAccountTypes = new Set<AccountType>([
+  "cash",
+  "savings",
+  "receivable",
+  "investment",
+  "other",
+]);
+
+const liabilityAccountTypes = new Set<AccountType>([
+  "credit_card",
+  "loan",
+  "liability",
+  "payable",
+]);
 
 export function calculateAccountBalance(
   account: Account,
@@ -15,13 +43,13 @@ export function calculateAccountBalance(
   }
 
   let balance = safeCheckedSum([account.startingBalance]);
-  const openingTime = Date.parse(account.openingDate);
+  const openingDate = account.openingDate.slice(0, 10);
 
   for (const transaction of transactions) {
     if (transaction.deleted) {
       continue;
     }
-    if (Date.parse(transaction.occurredAt) < openingTime) {
+    if (format(new Date(transaction.occurredAt), "yyyy-MM-dd") < openingDate) {
       continue;
     }
 
@@ -62,6 +90,94 @@ export function calculateAccountBalances(
     }));
 }
 
+export function calculateAccountBalancesAfterTransactions(
+  accounts: readonly Account[],
+  transactions: readonly Transaction[],
+): ReadonlyMap<string, readonly AccountBalance[]> {
+  const activeAccounts = accounts.filter((account) => !account.deleted);
+  const balances = new Map(
+    activeAccounts.map((account) => [account.id, account.startingBalance]),
+  );
+  const openingDates = new Map(
+    activeAccounts.map((account) => [
+      account.id,
+      account.openingDate.slice(0, 10),
+    ]),
+  );
+  const orderedTransactions = transactions
+    .map((transaction, index) => ({ transaction, index }))
+    .filter(({ transaction }) => !transaction.deleted)
+    .sort(
+      (left, right) =>
+        Date.parse(left.transaction.occurredAt) -
+          Date.parse(right.transaction.occurredAt) ||
+        left.transaction.id.localeCompare(right.transaction.id) ||
+        left.index - right.index,
+    );
+  const snapshots = new Map<string, readonly AccountBalance[]>();
+
+  for (const { transaction } of orderedTransactions) {
+    const touchedAccountIds = new Set<string>();
+    const transactionDate = format(
+      new Date(transaction.occurredAt),
+      "yyyy-MM-dd",
+    );
+
+    for (const split of transaction.splits) {
+      if (split.type === "income") {
+        applyMovement(
+          split.accountId,
+          split.amount,
+          true,
+          transactionDate,
+          balances,
+          openingDates,
+          touchedAccountIds,
+        );
+      } else if (split.type === "expense") {
+        applyMovement(
+          split.accountId,
+          split.amount,
+          false,
+          transactionDate,
+          balances,
+          openingDates,
+          touchedAccountIds,
+        );
+      } else {
+        applyMovement(
+          split.fromAccountId,
+          split.amount,
+          false,
+          transactionDate,
+          balances,
+          openingDates,
+          touchedAccountIds,
+        );
+        applyMovement(
+          split.toAccountId,
+          split.amount,
+          true,
+          transactionDate,
+          balances,
+          openingDates,
+          touchedAccountIds,
+        );
+      }
+    }
+
+    snapshots.set(
+      transaction.id,
+      Array.from(touchedAccountIds, (accountId) => ({
+        accountId,
+        balance: balances.get(accountId) ?? toPaise(0),
+      })),
+    );
+  }
+
+  return snapshots;
+}
+
 export function calculateNetWorth(
   accounts: readonly Account[],
   transactions: readonly Transaction[],
@@ -84,12 +200,87 @@ export function calculateBalanceSheet(
   });
 }
 
+export function calculateAccountTypeBalances(
+  accounts: readonly Account[],
+  transactions: readonly Transaction[],
+): readonly AccountTypeBalance[] {
+  const balances = new Map(
+    calculateAccountBalances(accounts, transactions).map((entry) => [
+      entry.accountId,
+      entry.balance,
+    ]),
+  );
+  const totals = new Map<AccountType, bigint>();
+
+  for (const account of accounts) {
+    if (account.deleted || account.hideFromReports) continue;
+    const balance = balances.get(account.id) ?? toPaise(0);
+    totals.set(
+      account.type,
+      (totals.get(account.type) ?? 0n) + BigInt(balance),
+    );
+  }
+
+  return Array.from(totals, ([accountType, balance]) => ({
+    accountType,
+    balance: checkedPaise(balance),
+  }));
+}
+
+export function calculateBalanceSheetSummary(
+  accounts: readonly Account[],
+  transactions: readonly Transaction[],
+): BalanceSheetSummary {
+  let assets = 0n;
+  let liabilities = 0n;
+
+  for (const account of accounts) {
+    if (account.deleted || account.hideFromReports) continue;
+    const balance = calculateAccountBalance(account, transactions);
+
+    if (assetAccountTypes.has(account.type) && balance > 0) {
+      assets += BigInt(balance);
+    }
+    if (liabilityAccountTypes.has(account.type) && balance < 0) {
+      liabilities += -BigInt(balance);
+    }
+  }
+
+  return {
+    assets: checkedPaise(assets),
+    liabilities: checkedPaise(liabilities),
+    netWorth: calculateNetWorth(accounts, transactions),
+  };
+}
+
 function addPaise(left: Paise, right: Paise): Paise {
   return checkedPaise(BigInt(left) + BigInt(right));
 }
 
 function subtractPaise(left: Paise, right: Paise): Paise {
   return checkedPaise(BigInt(left) - BigInt(right));
+}
+
+function applyMovement(
+  accountId: string,
+  amount: Paise,
+  isCredit: boolean,
+  transactionDate: string,
+  balances: Map<string, Paise>,
+  openingDates: Map<string, string>,
+  touchedAccountIds: Set<string>,
+): void {
+  const balance = balances.get(accountId);
+  const openingDate = openingDates.get(accountId);
+  if (balance === undefined || openingDate === undefined) return;
+
+  touchedAccountIds.add(accountId);
+  if (transactionDate < openingDate) return;
+
+  balances.set(
+    accountId,
+    isCredit ? addPaise(balance, amount) : subtractPaise(balance, amount),
+  );
 }
 
 function safeCheckedSum(values: readonly Paise[]): Paise {

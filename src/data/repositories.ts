@@ -131,8 +131,10 @@ export function createRepository<
       const updated = schema.parse({
         ...existing,
         ...changes,
-        id,
+        id: existing.id,
+        createdAt: existing.createdAt,
         updatedAt: timestamp(),
+        deleted: existing.deleted,
       });
       await table.put(updated);
       return updated;
@@ -248,7 +250,10 @@ export function createCategoryGroupRepository(
   );
   return {
     ...repository,
-    async update(id: string, changes: RecordChanges<CategoryGroup>): Promise<CategoryGroup> {
+    async update(
+      id: string,
+      changes: RecordChanges<CategoryGroup>,
+    ): Promise<CategoryGroup> {
       return database.transaction(
         "rw",
         [database.categoryGroups, database.categories],
@@ -257,11 +262,19 @@ export function createCategoryGroupRepository(
           if (!existing) {
             throw new Error(`Record ${id} does not exist`);
           }
+          if (
+            id === SEED_IDS.expenseOtherGroup ||
+            id === SEED_IDS.incomeOtherGroup
+          ) {
+            throw new Error("Built-in Other category groups cannot be edited");
+          }
           const updated = categoryGroupSchema.parse({
             ...existing,
             ...changes,
-            id,
+            id: existing.id,
+            createdAt: existing.createdAt,
             updatedAt: toUtcIso(options.now?.() ?? new Date()),
+            deleted: existing.deleted,
           });
           if (updated.kind !== existing.kind) {
             const mismatched = await database.categories
@@ -288,6 +301,12 @@ export function createCategoryGroupRepository(
           if (!categoryGroup) {
             throw new Error(`Record ${id} does not exist`);
           }
+          if (
+            id === SEED_IDS.expenseOtherGroup ||
+            id === SEED_IDS.incomeOtherGroup
+          ) {
+            throw new Error("Built-in Other category groups cannot be deleted");
+          }
           const inUse = await database.categories
             .filter((category) => !category.deleted && category.groupId === id)
             .count();
@@ -313,6 +332,12 @@ export function createCategoryGroupRepository(
             throw new Error(
               `Record ${id} must be in trash before permanent purge`,
             );
+          }
+          if (
+            id === SEED_IDS.expenseOtherGroup ||
+            id === SEED_IDS.incomeOtherGroup
+          ) {
+            throw new Error("Built-in Other category groups cannot be purged");
           }
           const inUse = await database.categories
             .filter((category) => category.groupId === id)
@@ -370,8 +395,10 @@ export function createCategoryRepository(
           const updated = categorySchema.parse({
             ...existing,
             ...changes,
-            id,
+            id: existing.id,
+            createdAt: existing.createdAt,
             updatedAt: toUtcIso(options.now?.() ?? new Date()),
+            deleted: existing.deleted,
           });
           await assertCategoryGroupAvailable(
             database,
@@ -397,6 +424,13 @@ export function createCategoryRepository(
         },
       );
     },
+    async purge(id: string): Promise<boolean> {
+      const existing = await repository.get(id);
+      if (existing?.builtIn) {
+        throw new Error("Built-in categories cannot be purged");
+      }
+      return repository.purge(id);
+    },
     async softDelete(id: string): Promise<Category> {
       const category = await repository.get(id);
       if (category?.builtIn) {
@@ -405,7 +439,7 @@ export function createCategoryRepository(
       await deleteCategoryAndReassign(
         database,
         id,
-        SEED_IDS.other,
+        category?.kind === "income" ? SEED_IDS.incomeOther : SEED_IDS.other,
         options.now?.() ?? new Date(),
       );
       const deleted = await repository.get(id);
@@ -511,8 +545,10 @@ export function createPayeeRepository(
           const updated = payeeSchema.parse({
             ...existing,
             ...changes,
-            id,
+            id: existing.id,
+            createdAt: existing.createdAt,
             updatedAt: toUtcIso(options.now?.() ?? new Date()),
+            deleted: existing.deleted,
           });
           await assertPayeeGroupAvailable(database, updated.groupId);
           await database.payees.put(updated);
@@ -675,8 +711,10 @@ export function createTransactionRepository(
           const updated = transactionSchema.parse({
             ...existing,
             ...changes,
-            id,
+            id: existing.id,
+            createdAt: existing.createdAt,
             updatedAt: toUtcIso(options.now?.() ?? new Date()),
+            deleted: existing.deleted,
           });
           await assertTransactionReferencesAvailable(database, updated);
           await database.transactions.put(updated);
@@ -805,8 +843,10 @@ export function createScheduleRepository(
           const updated = scheduledTransactionSchema.parse({
             ...existing,
             ...changes,
-            id,
+            id: existing.id,
+            createdAt: existing.createdAt,
             updatedAt: toUtcIso(options.now?.() ?? new Date()),
+            deleted: existing.deleted,
           });
           await assertScheduleReferencesAvailable(database, updated);
           await database.scheduledTransactions.put(updated);
@@ -920,8 +960,10 @@ export function createOccurrenceRepository(
           const updated = occurrenceRecordSchema.parse({
             ...existing,
             ...changes,
-            id,
+            id: existing.id,
+            createdAt: existing.createdAt,
             updatedAt: toUtcIso(options.now?.() ?? new Date()),
+            deleted: existing.deleted,
           });
           await assertOccurrenceReferencesAvailable(database, updated);
           await database.occurrenceRecords.put(updated);
@@ -975,3 +1017,13 @@ export const repositories = {
   occurrences: createOccurrenceRepository(db),
   settings: createSettingsRepository(db),
 };
+
+export {
+  endSchedule,
+  evaluateSchedules,
+  pauseSchedule,
+  recordScheduleOccurrence,
+  skipScheduleOccurrence,
+  OccurrenceAlreadyRecordedError,
+  OccurrenceAlreadySkippedError,
+} from "@/data/scheduleEvaluation";
