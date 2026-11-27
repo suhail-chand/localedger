@@ -2,6 +2,7 @@
 description: TypeScript and React conventions for all source files
 applyTo: "src/**/*.{ts,tsx}"
 ---
+
 - TypeScript strict mode. No `any`, no non-null assertions (`!`) without a comment explaining why it is safe, no `@ts-ignore` (use `@ts-expect-error` with a reason).
 - Derive types from Zod schemas (`z.infer`) so types and runtime validation cannot drift.
 - Function components and hooks only. Keep components small; extract logic into hooks (`useXxx`) and pure functions in `domain/`.

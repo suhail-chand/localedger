@@ -105,7 +105,7 @@ describe("JSON backup and restore", () => {
     expect(exported.schemaVersion).toBe(LOCAL_SCHEMA_VERSION);
     expect(exported.data.accounts).toHaveLength(1);
     expect(exported.data.accounts[0]?.name).toBe("Cash");
-    expect(exported.data.categoryGroups).toHaveLength(4);
+    expect(exported.data.categoryGroups).toHaveLength(18);
 
     await accounts.softDelete("40000000-0000-4000-8000-000000000001");
     await restoreBackup(database, json, {

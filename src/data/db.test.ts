@@ -134,8 +134,11 @@ describe("Localedger IndexedDB foundation", () => {
       key: "schema",
       version: LOCAL_SCHEMA_VERSION,
     });
-    expect(await database.categoryGroups.count()).toBe(4);
-    expect(await database.categories.count()).toBe(4);
+    const groups = await database.categoryGroups.toArray();
+    const categories = await database.categories.toArray();
+
+    expect(groups.length).toBe(18);
+    expect(categories.length).toBe(68);
     expect(await database.payees.count()).toBe(1);
 
     expect(await database.categories.get(SEED_IDS.other)).toMatchObject({
@@ -175,6 +178,63 @@ describe("Localedger IndexedDB foundation", () => {
       builtIn: true,
       deleted: false,
     });
+
+    const findGroup = async (name: string, kind: "expense" | "income") =>
+      database.categoryGroups
+        .where("name")
+        .equals(name)
+        .filter((group) => group.kind === kind && !group.deleted)
+        .first();
+
+    const housing = await findGroup("Housing", "expense");
+    const food = await findGroup("Food & Dining", "expense");
+    const employment = await findGroup("Employment", "income");
+    const investments = await findGroup("Investments", "income");
+
+    expect(housing).toBeDefined();
+    expect(food).toBeDefined();
+    expect(employment).toBeDefined();
+    expect(investments).toBeDefined();
+
+    const rent = await database.categories.where("name").equals("Rent").first();
+
+    expect(rent).toMatchObject({
+      name: "Rent",
+      kind: "expense",
+      groupId: housing!.id,
+      deleted: false,
+    });
+
+    const salary = await database.categories
+      .where("name")
+      .equals("Salary")
+      .first();
+
+    expect(salary).toMatchObject({
+      name: "Salary",
+      kind: "income",
+      groupId: employment!.id,
+      deleted: false,
+    });
+
+    for (const name of ["Cashback", "Refunds", "Rewards", "Gifts"]) {
+      const category = await database.categories
+        .where("name")
+        .equals(name)
+        .filter(
+          (category) =>
+            category.kind === "income" &&
+            category.groupId === SEED_IDS.incomeOtherGroup,
+        )
+        .first();
+
+      expect(category).toMatchObject({
+        name,
+        kind: "income",
+        groupId: SEED_IDS.incomeOtherGroup,
+        deleted: false,
+      });
+    }
   });
 
   it("seeding is idempotent", async () => {
@@ -183,8 +243,8 @@ describe("Localedger IndexedDB foundation", () => {
 
     await seedDefaults(database, new Date("2027-01-01T00:00:00.000Z"));
 
-    expect(await database.categoryGroups.count()).toBe(4);
-    expect(await database.categories.count()).toBe(4);
+    expect(await database.categoryGroups.count()).toBe(18);
+    expect(await database.categories.count()).toBe(68);
     expect(await database.payees.count()).toBe(1);
   });
 
@@ -207,22 +267,26 @@ describe("Localedger IndexedDB foundation", () => {
       ),
     });
 
-    expect(await readIds(first)).toEqual(await readIds(second));
-    expect(await readIds(first)).toEqual({
-      groups: [
-        "10000000-0000-4000-8000-000000000001",
-        "10000000-0000-4000-8000-000000000002",
-        "10000000-0000-4000-8000-000000000003",
-        "10000000-0000-4000-8000-000000000004",
-      ],
-      categories: [
-        "20000000-0000-4000-8000-000000000001",
-        "20000000-0000-4000-8000-000000000002",
-        "20000000-0000-4000-8000-000000000003",
-        "20000000-0000-4000-8000-000000000004",
-      ],
-      payees: ["30000000-0000-4000-8000-000000000001"],
-    });
+    const firstIds = await readIds(first);
+    const secondIds = await readIds(second);
+
+    // Both databases contain the same number of records.
+    expect(firstIds.groups).toHaveLength(secondIds.groups.length);
+    expect(firstIds.categories).toHaveLength(secondIds.categories.length);
+
+    // IDs are unique within each database.
+    expect(new Set(firstIds.groups).size).toBe(firstIds.groups.length);
+    expect(new Set(firstIds.categories).size).toBe(firstIds.categories.length);
+
+    // Built-in IDs remain stable.
+    expect(firstIds.groups).toContain(SEED_IDS.expenseOtherGroup);
+    expect(firstIds.groups).toContain(SEED_IDS.incomeOtherGroup);
+    expect(firstIds.categories).toContain(SEED_IDS.other);
+    expect(firstIds.categories).toContain(SEED_IDS.incomeOther);
+
+    expect(firstIds.groups).toHaveLength(18);
+    expect(firstIds.categories).toHaveLength(68);
+    expect(firstIds.payees).toEqual([SEED_IDS.unspecified]);
   });
 
   it("validates a previous-version metadata fixture", async () => {
