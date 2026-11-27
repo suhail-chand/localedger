@@ -3,7 +3,7 @@ import { MAX_PAISE } from "@/domain/constants";
 
 export { MAX_PAISE } from "@/domain/constants";
 
-export type MoneySignMode = "always" | "negative" | "none";
+export type MoneySignMode = "always" | "none";
 
 export function toPaise(value: number): Paise {
   if (!Number.isSafeInteger(value)) {

@@ -394,6 +394,35 @@ describe("data repositories", () => {
     expect(await accounts.get(account.id)).toBeUndefined();
   });
 
+  it("preserves base fields and tombstone state on update", async () => {
+    const database = await setupDatabase("repository-update-base-fields");
+    const accounts = createAccountRepository(
+      database,
+      fixedOptions("2026-11-26T11:00:00.000Z"),
+    );
+    const account = await accounts.create({
+      name: "Cash",
+      type: "cash",
+      openingDate: "2026-11-26T00:00:00.000Z",
+      startingBalance: toPaise(0),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: false,
+    });
+
+    const changes = {
+      ...account,
+      name: "Wallet",
+      createdAt: "2000-01-01T00:00:00.000Z",
+      deleted: true,
+    };
+    const updated = await accounts.update(account.id, changes);
+
+    expect(updated.createdAt).toBe(account.createdAt);
+    expect(updated.deleted).toBe(false);
+  });
+
   it("rejects corrupt IndexedDB reads instead of silently fixing them", async () => {
     const database = await setupDatabase("repository-validation");
     await database.accounts.put({
@@ -426,10 +455,7 @@ describe("data repositories", () => {
       database,
       fixedOptions("2026-11-26T11:00:00.000Z"),
     );
-    const other = await database.categories
-      .where("name")
-      .equals("Other")
-      .first();
+    const other = await database.categories.get(SEED_IDS.other);
     if (!other) throw new Error("Other category missing");
 
     const category = await categories.create({
@@ -475,6 +501,90 @@ describe("data repositories", () => {
     expect((await categories.get(category.id))?.deleted).toBe(true);
     expect((await transactions.get(transaction.id))?.splits[0]).toMatchObject({
       categoryId: other.id,
+    });
+  });
+
+  it("reassigns deleted income categories to Income Other in transactions and schedules", async () => {
+    const database = await setupDatabase("income-category-reassignment");
+    const categories = createCategoryRepository(database);
+    const transactions = createTransactionRepository(database);
+    const schedules = createScheduleRepository(database);
+    const account = await createAccountRepository(database).create({
+      name: "Bank",
+      type: "savings",
+      openingDate: "2026-11-26T00:00:00.000Z",
+      startingBalance: toPaise(0),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: false,
+    });
+    const category = await categories.create({
+      name: "Salary",
+      icon: "briefcase",
+      groupId: SEED_IDS.incomeGroup,
+      kind: "income",
+    });
+    const transaction = await transactions.create({
+      title: "Pay",
+      occurredAt: "2026-11-26T10:00:00.000Z",
+      currency: "INR",
+      splits: [
+        {
+          id: "60000000-0000-4000-8000-000000000071",
+          type: "income",
+          amount: toPaise(1000),
+          accountId: account.id,
+          categoryId: category.id,
+          note: "",
+        },
+      ],
+      labelIds: [],
+      status: "cleared",
+      note: "",
+    });
+    const schedule = await schedules.create({
+      scheduleType: "one_time",
+      template: {
+        title: "Pay",
+        occurredAt: "2026-11-26T10:00:00.000Z",
+        currency: "INR",
+        splits: [
+          {
+            id: "60000000-0000-4000-8000-000000000072",
+            type: "income",
+            amount: toPaise(1000),
+            accountId: account.id,
+            categoryId: category.id,
+            note: "",
+          },
+        ],
+        labelIds: [],
+        status: "cleared",
+        note: "",
+      },
+      recurrence: { type: "once" },
+      startAt: "2026-11-26T10:00:00.000Z",
+      autoRecord: false,
+      status: "active",
+    });
+
+    await categories.softDelete(category.id);
+
+    expect(await database.categories.get(SEED_IDS.incomeOther)).toMatchObject({
+      name: "Other",
+      kind: "income",
+      groupId: SEED_IDS.incomeOtherGroup,
+      builtIn: true,
+      deleted: false,
+    });
+    expect((await transactions.get(transaction.id))?.splits[0]).toMatchObject({
+      type: "income",
+      categoryId: SEED_IDS.incomeOther,
+    });
+    expect((await schedules.get(schedule.id))?.template.splits[0]).toMatchObject({
+      type: "income",
+      categoryId: SEED_IDS.incomeOther,
     });
   });
 
@@ -840,15 +950,19 @@ describe("data repositories", () => {
     const database = await setupDatabase("category-built-in-edit");
     await ensureDatabaseReady(database);
     const categories = createCategoryRepository(database);
-    const other = await database.categories
-      .where("name")
-      .equals("Other")
-      .first();
+    const other = await database.categories.get(SEED_IDS.other);
     if (!other) throw new Error("Other category missing");
 
     await expect(
       categories.update(other.id, { name: "Renamed" }),
     ).rejects.toThrow("Built-in categories cannot be edited");
+    await expect(categories.softDelete(other.id)).rejects.toThrow(
+      "Built-in categories cannot be deleted",
+    );
+    await database.categories.put({ ...other, deleted: true });
+    await expect(categories.purge(other.id)).rejects.toThrow(
+      "Built-in categories cannot be purged",
+    );
   });
 
   it("does not allow changing a category group kind with mismatched categories", async () => {
@@ -895,6 +1009,28 @@ describe("data repositories", () => {
     await expect(payeeGroups.softDelete(payeeGroup.id)).rejects.toThrow(
       "Payee group is in use",
     );
+  });
+
+  it("protects the built-in Other category groups", async () => {
+    const database = await setupDatabase("protected-other-groups");
+    const groups = createCategoryGroupRepository(database);
+
+    await expect(
+      groups.update(SEED_IDS.expenseOtherGroup, { name: "Expenses" }),
+    ).rejects.toThrow("Built-in Other category groups cannot be edited");
+    await expect(
+      groups.softDelete(SEED_IDS.incomeOtherGroup),
+    ).rejects.toThrow("Built-in Other category groups cannot be deleted");
+    expect(await groups.get(SEED_IDS.expenseOtherGroup)).toMatchObject({
+      name: "Other",
+      kind: "expense",
+      deleted: false,
+    });
+    expect(await groups.get(SEED_IDS.incomeOtherGroup)).toMatchObject({
+      name: "Other",
+      kind: "income",
+      deleted: false,
+    });
   });
 
   it("keeps groups until their trashed children are purged", async () => {

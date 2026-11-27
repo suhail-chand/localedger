@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { db, ensureDatabaseReady } from "@/data/db";
 import { createCategoryGroupRepository, createCategoryRepository } from "@/data/repositories";
+import { SEED_IDS } from "@/data/seed";
 import { CategoriesScreen } from "./CategoriesScreen";
 
 describe("CategoriesScreen", () => {
@@ -50,6 +51,59 @@ describe("CategoriesScreen", () => {
     await screen.findByText("Other");
     expect(screen.queryByRole("button", { name: "Edit Other" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete Other" })).not.toBeInTheDocument();
+  });
+
+  it("shows protected Other groups and categories for both kinds", async () => {
+    const timestamp = "2026-11-26T10:00:00.000Z";
+    await db.categoryGroups.bulkPut([
+      {
+        id: SEED_IDS.expenseOtherGroup,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deleted: false,
+        name: "Other",
+        kind: "expense",
+      },
+      {
+        id: SEED_IDS.incomeOtherGroup,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deleted: false,
+        name: "Other",
+        kind: "income",
+      },
+    ]);
+    await db.categories.bulkPut([
+      {
+        id: SEED_IDS.other,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deleted: false,
+        name: "Other",
+        icon: "ellipsis",
+        groupId: SEED_IDS.expenseOtherGroup,
+        kind: "expense",
+        builtIn: true,
+      },
+      {
+        id: SEED_IDS.incomeOther,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deleted: false,
+        name: "Other",
+        icon: "ellipsis",
+        groupId: SEED_IDS.incomeOtherGroup,
+        kind: "income",
+        builtIn: true,
+      },
+    ]);
+    render(<CategoriesScreen />);
+
+    expect(await screen.findAllByText("Built-in")).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: "Edit Other" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete Other" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit group Other" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete group Other" })).not.toBeInTheDocument();
   });
 
   it("blocks deleting a group that contains categories", async () => {

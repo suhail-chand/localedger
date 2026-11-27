@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   calculateAccountBalance,
   calculateAccountBalances,
+  calculateAccountTypeBalances,
+  calculateBalanceSheetSummary,
   calculateNetWorth,
 } from "@/domain/balances";
 import type { Account, Transaction } from "@/domain/types";
@@ -123,6 +125,34 @@ describe("derived account balances", () => {
     expect(calculateAccountBalance(account, transactions)).toBe(10000);
   });
 
+  it("includes transactions after local midnight on the opening date", () => {
+    vi.stubEnv("TZ", "Asia/Kolkata");
+    try {
+      const account = buildAccount({
+        openingDate: "2026-01-10T00:00:00.000Z",
+      });
+      const transaction = buildTransaction({
+        occurredAt: "2026-01-09T19:01:00.000Z",
+        splits: [
+          {
+            id: base.id,
+            type: "income",
+            amount: toPaise(5000),
+            accountId: account.id,
+            note: "",
+          },
+        ],
+      });
+
+      expect(Date.parse(transaction.occurredAt)).toBeLessThan(
+        Date.parse(account.openingDate),
+      );
+      expect(calculateAccountBalance(account, [transaction])).toBe(15000);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("supports negative balances and excludes hidden accounts from net worth", () => {
     const loan = buildAccount({
       id: "44444444-4444-4444-8444-444444444444",
@@ -149,5 +179,41 @@ describe("derived account balances", () => {
     expect(calculateAccountBalance(buildAccount({ deleted: true }), [])).toBe(
       0,
     );
+  });
+
+  it("summarizes assets, liabilities and per-type totals for the balance sheet", () => {
+    const savings = buildAccount({
+      id: "66666666-6666-4666-8666-666666666666",
+      name: "Savings",
+      type: "savings",
+      startingBalance: toPaise(150000),
+    });
+    const loan = buildAccount({
+      id: "77777777-7777-4777-8777-777777777777",
+      name: "Loan",
+      type: "loan",
+      startingBalance: toPaise(-50000),
+    });
+    const hidden = buildAccount({
+      id: "88888888-8888-4888-8888-888888888888",
+      name: "Hidden",
+      type: "cash",
+      startingBalance: toPaise(250000),
+      hideFromReports: true,
+    });
+
+    expect(
+      calculateBalanceSheetSummary([savings, loan, hidden], []),
+    ).toEqual({
+      assets: 150000,
+      liabilities: 50000,
+      netWorth: 100000,
+    });
+    expect(
+      calculateAccountTypeBalances([savings, loan, hidden], []),
+    ).toEqual([
+      { accountType: "savings", balance: 150000 },
+      { accountType: "loan", balance: -50000 },
+    ]);
   });
 });

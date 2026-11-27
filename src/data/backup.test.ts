@@ -27,6 +27,7 @@ import {
   createTransactionRepository,
 } from "@/data/repositories";
 import { LOCAL_SCHEMA_VERSION } from "@/data/migrations";
+import { SEED_IDS } from "@/data/seed";
 import { toPaise } from "@/domain/money";
 
 const databases: LocaledgerDatabase[] = [];
@@ -104,7 +105,7 @@ describe("JSON backup and restore", () => {
     expect(exported.schemaVersion).toBe(LOCAL_SCHEMA_VERSION);
     expect(exported.data.accounts).toHaveLength(1);
     expect(exported.data.accounts[0]?.name).toBe("Cash");
-    expect(exported.data.categoryGroups).toHaveLength(2);
+    expect(exported.data.categoryGroups).toHaveLength(4);
 
     await accounts.softDelete("40000000-0000-4000-8000-000000000001");
     await restoreBackup(database, json, {
@@ -128,6 +129,52 @@ describe("JSON backup and restore", () => {
       startingBalance: toPaise(12500),
       deleted: false,
     });
+  });
+
+  it("migrates a previous-version backup to kind-matched Other fallbacks", async () => {
+    const database = await setupDatabase("backup-fallback-migration");
+    const current = JSON.parse(
+      await exportBackup(database, new Date("2026-11-26T12:00:00.000Z")),
+    ) as BackupDocument;
+    const oldBackup: BackupDocument = {
+      ...current,
+      schemaVersion: 1,
+      data: {
+        ...current.data,
+        categoryGroups: current.data.categoryGroups.filter(
+          (group) =>
+            group.id !== SEED_IDS.expenseOtherGroup &&
+            group.id !== SEED_IDS.incomeOtherGroup,
+        ),
+        categories: current.data.categories
+          .filter((category) => category.id !== SEED_IDS.incomeOther)
+          .map((category) =>
+            category.id === SEED_IDS.other
+              ? { ...category, groupId: SEED_IDS.expenseGroup }
+              : category,
+          ),
+      },
+    };
+
+    const migrated = parseBackupJson(JSON.stringify(oldBackup));
+
+    expect(migrated.schemaVersion).toBe(LOCAL_SCHEMA_VERSION);
+    expect(migrated.data.categories).toContainEqual(
+      expect.objectContaining({
+        id: SEED_IDS.other,
+        kind: "expense",
+        groupId: SEED_IDS.expenseOtherGroup,
+        builtIn: true,
+      }),
+    );
+    expect(migrated.data.categories).toContainEqual(
+      expect.objectContaining({
+        id: SEED_IDS.incomeOther,
+        kind: "income",
+        groupId: SEED_IDS.incomeOtherGroup,
+        builtIn: true,
+      }),
+    );
   });
 
   it("refuses to export data with dangling references", async () => {

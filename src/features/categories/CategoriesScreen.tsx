@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { Sheet } from "@/components/Sheet";
 import { db } from "@/data/db";
+import { SEED_IDS } from "@/data/seed";
 import {
   createCategoryGroupRepository,
   createCategoryRepository,
@@ -80,10 +81,24 @@ export function CategoriesScreen() {
   const [saving, setSaving] = useState(false);
 
   const data = useLiveQuery(
-    async () => ({
-      groups: await groupRepository.list(),
-      categories: await categoryRepository.list(),
-    }),
+    async () => {
+      try {
+        return {
+          groups: await groupRepository.list(),
+          categories: await categoryRepository.list(),
+          error: null,
+        };
+      } catch (error) {
+        return {
+          groups: null,
+          categories: null,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Unable to load categories",
+        };
+      }
+    },
     [],
   );
   const groups = useMemo(() => data?.groups ?? [], [data]);
@@ -228,6 +243,10 @@ export function CategoriesScreen() {
 
       {data === undefined ? (
         <p role="status" className="text-sm text-gray-600">Loading categories...</p>
+      ) : data.error ? (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+          Unable to load categories: {data.error}
+        </p>
       ) : groups.length === 0 && categories.length === 0 ? (
         <EmptyState title="No categories yet" description="Create a category group and category." action={<Button onClick={openCreateGroup}>Create group</Button>} />
       ) : (
@@ -242,10 +261,15 @@ export function CategoriesScreen() {
                   <article key={group.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <h3 className="font-medium">{group.name}</h3>
-                      <div className="flex gap-2">
-                        <Button variant="secondary" onClick={() => openEditGroup(group)} aria-label={`Edit group ${group.name}`} className="px-3"><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="danger" onClick={() => { setDeletingGroup(group); setDeleteError(""); }} aria-label={`Delete group ${group.name}`} className="px-3"><Trash2 className="h-4 w-4" /></Button>
-                      </div>
+                      {group.id === SEED_IDS.expenseOtherGroup ||
+                      group.id === SEED_IDS.incomeOtherGroup ? (
+                        <span className="text-xs text-gray-500">Built-in</span>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button variant="secondary" onClick={() => openEditGroup(group)} aria-label={`Edit group ${group.name}`} className="px-3"><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="danger" onClick={() => { setDeletingGroup(group); setDeleteError(""); }} aria-label={`Delete group ${group.name}`} className="px-3"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       {categories.filter((category) => category.groupId === group.id).map((category) => {
@@ -325,7 +349,7 @@ export function CategoriesScreen() {
       </Sheet>
 
       <ConfirmDialog open={deletingGroup !== undefined} title={`Delete ${deletingGroup?.name ?? "group"}?`} description={deleteError || "This group will be moved to trash. It can only be deleted when it has no categories."} confirmLabel="Delete" onConfirm={() => void deleteGroup()} onCancel={() => { setDeletingGroup(undefined); setDeleteError(""); }} />
-      <ConfirmDialog open={deletingCategory !== undefined} title={`Delete ${deletingCategory?.name ?? "category"}?`} description={deleteError || "Transactions using this category will be reassigned to Other."} confirmLabel="Delete" onConfirm={() => void deleteCategory()} onCancel={() => { setDeletingCategory(undefined); setDeleteError(""); }} />
+      <ConfirmDialog open={deletingCategory !== undefined} title={`Delete ${deletingCategory?.name ?? "category"}?`} description={deleteError || `Transactions using this category will be reassigned to ${deletingCategory?.kind === "income" ? "Income" : "Expense"} Other.`} confirmLabel="Delete" onConfirm={() => void deleteCategory()} onCancel={() => { setDeletingCategory(undefined); setDeleteError(""); }} />
     </section>
   );
 }

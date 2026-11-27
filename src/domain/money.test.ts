@@ -67,6 +67,8 @@ describe("integer paise money helpers", () => {
     expect(formatPaise(toPaise(123450))).toBe("+₹1,234.50");
     expect(formatInr(toPaise(-123450))).toBe("-₹1,234.50");
     expect(formatPaise(toPaise(123450), "none")).toBe("₹1,234.50");
+    expect(formatPaise(toPaise(123450), "always")).toBe("+₹1,234.50");
+    expect(formatPaise(toPaise(-123450), "always")).toBe("-₹1,234.50");
     expect(formatPaise(toPaise(0))).toBe("₹0.00");
   });
 

@@ -11,10 +11,13 @@ import {
 export const SEED_IDS = {
   expenseGroup: "10000000-0000-4000-8000-000000000001",
   incomeGroup: "10000000-0000-4000-8000-000000000002",
+  expenseOtherGroup: "10000000-0000-4000-8000-000000000003",
+  incomeOtherGroup: "10000000-0000-4000-8000-000000000004",
   other: "20000000-0000-4000-8000-000000000001",
   unspecified: "30000000-0000-4000-8000-000000000001",
   interest: "20000000-0000-4000-8000-000000000002",
   tax: "20000000-0000-4000-8000-000000000003",
+  incomeOther: "20000000-0000-4000-8000-000000000004",
 } as const;
 
 function seedTimestamp(now: Date): string {
@@ -58,6 +61,22 @@ export async function seedDefaults(
           name: "Income",
           kind: "income",
         },
+        {
+          id: SEED_IDS.expenseOtherGroup,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          deleted: false,
+          name: "Other",
+          kind: "expense",
+        },
+        {
+          id: SEED_IDS.incomeOtherGroup,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          deleted: false,
+          name: "Other",
+          kind: "income",
+        },
       ];
 
       const categories: Category[] = [
@@ -68,8 +87,19 @@ export async function seedDefaults(
           deleted: false,
           name: "Other",
           icon: "ellipsis",
-          groupId: SEED_IDS.expenseGroup,
+          groupId: SEED_IDS.expenseOtherGroup,
           kind: "expense",
+          builtIn: true,
+        },
+        {
+          id: SEED_IDS.incomeOther,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          deleted: false,
+          name: "Other",
+          icon: "ellipsis",
+          groupId: SEED_IDS.incomeOtherGroup,
+          kind: "income",
           builtIn: true,
         },
         {
@@ -114,6 +144,111 @@ export async function seedDefaults(
       await database.categoryGroups.bulkPut(groups);
       await database.categories.bulkPut(categories);
       await database.payees.put(unspecified);
+      await database.metadata.put({
+        key: "schema",
+        version: LOCAL_SCHEMA_VERSION,
+      });
+    },
+  );
+}
+
+export async function migrateCategoryFallbacks(
+  database: LocaledgerDatabase,
+  now = new Date(),
+): Promise<void> {
+  const timestamp = seedTimestamp(now);
+  await database.transaction(
+    "rw",
+    [database.metadata, database.categoryGroups, database.categories],
+    async () => {
+      const metadata = await database.metadata.get("schema");
+      if (!metadata || metadata.version !== 1) {
+        throw new Error("Cannot migrate category fallbacks from this schema");
+      }
+
+      const expenseOther = categorySchema.parse(
+        await database.categories.get(SEED_IDS.other),
+      );
+      if (
+        expenseOther.deleted ||
+        expenseOther.builtIn !== true ||
+        expenseOther.kind !== "expense"
+      ) {
+        throw new Error("Built-in Expense Other category is missing or invalid");
+      }
+
+      const groups: CategoryGroup[] = [
+        {
+          id: SEED_IDS.expenseOtherGroup,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          deleted: false,
+          name: "Other",
+          kind: "expense",
+        },
+        {
+          id: SEED_IDS.incomeOtherGroup,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          deleted: false,
+          name: "Other",
+          kind: "income",
+        },
+      ];
+      for (const group of groups) {
+        const parsedGroup = categoryGroupSchema.parse(group);
+        const existing = await database.categoryGroups.get(group.id);
+        if (existing) {
+          const parsed = categoryGroupSchema.parse(existing);
+          if (
+            parsed.deleted ||
+            parsed.name !== group.name ||
+            parsed.kind !== group.kind
+          ) {
+            throw new Error(`Built-in ${group.kind} Other group is invalid`);
+          }
+        } else {
+          await database.categoryGroups.add(parsedGroup);
+        }
+      }
+
+      const incomeOther = await database.categories.get(SEED_IDS.incomeOther);
+      if (incomeOther) {
+        const parsed = categorySchema.parse(incomeOther);
+        if (
+          parsed.deleted ||
+          parsed.builtIn !== true ||
+          parsed.name !== "Other" ||
+          parsed.kind !== "income" ||
+          parsed.groupId !== SEED_IDS.incomeOtherGroup
+        ) {
+          throw new Error("Built-in Income Other category is invalid");
+        }
+      } else {
+        await database.categories.add(
+          categorySchema.parse({
+            id: SEED_IDS.incomeOther,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            deleted: false,
+            name: "Other",
+            icon: "ellipsis",
+            groupId: SEED_IDS.incomeOtherGroup,
+            kind: "income",
+            builtIn: true,
+          }),
+        );
+      }
+
+      if (expenseOther.groupId !== SEED_IDS.expenseOtherGroup) {
+        await database.categories.put(
+          categorySchema.parse({
+            ...expenseOther,
+            groupId: SEED_IDS.expenseOtherGroup,
+            updatedAt: timestamp,
+          }),
+        );
+      }
       await database.metadata.put({
         key: "schema",
         version: LOCAL_SCHEMA_VERSION,

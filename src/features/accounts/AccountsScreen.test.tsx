@@ -15,6 +15,122 @@ describe("AccountsScreen", () => {
     await db.scheduledTransactions.clear();
   });
 
+  it("shows a negative account balance with a minus sign", async () => {
+    const repository = createAccountRepository(db);
+    await repository.create({
+      name: "Credit card",
+      type: "credit_card",
+      openingDate: "2026-01-01T00:00:00.000Z",
+      startingBalance: toPaise(-12345),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: false,
+    });
+
+    render(<AccountsScreen />);
+
+    expect((await screen.findAllByText("-₹123.45")).length).toBeGreaterThan(0);
+  });
+
+  it("shows a positive account balance with a plus sign", async () => {
+    const repository = createAccountRepository(db);
+    await repository.create({
+      name: "Wallet",
+      type: "cash",
+      openingDate: "2026-01-01T00:00:00.000Z",
+      startingBalance: toPaise(123450),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: false,
+    });
+
+    render(<AccountsScreen />);
+
+    expect((await screen.findAllByText("+₹1,234.50")).length).toBeGreaterThan(0);
+  });
+
+  it("shows assets, liabilities, net worth and account-type totals", async () => {
+    const repository = createAccountRepository(db);
+    await repository.create({
+      name: "Savings",
+      type: "savings",
+      openingDate: "2026-01-01T00:00:00.000Z",
+      startingBalance: toPaise(150000),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: false,
+    });
+    await repository.create({
+      name: "Home loan",
+      type: "loan",
+      openingDate: "2026-01-01T00:00:00.000Z",
+      startingBalance: toPaise(-50000),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: false,
+    });
+    await repository.create({
+      name: "Private fund",
+      type: "cash",
+      openingDate: "2026-01-01T00:00:00.000Z",
+      startingBalance: toPaise(250000),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: true,
+    });
+
+    render(<AccountsScreen />);
+
+    const assetsLabel = await screen.findByText("Total assets");
+    const liabilitiesLabel = screen.getByText("Total liabilities");
+    const netWorthLabel = screen.getByText("Net worth");
+    expect(assetsLabel.parentElement).toHaveTextContent("₹1,500.00");
+    expect(liabilitiesLabel.parentElement).toHaveTextContent("₹500.00");
+    expect(netWorthLabel.parentElement).toHaveTextContent("+₹1,000.00");
+
+    const savingsHeading = screen.getByRole("heading", {
+      name: "Savings / Bank",
+    });
+    const savingsSection = savingsHeading.closest("section");
+    expect(savingsSection).not.toBeNull();
+    expect(savingsSection).toHaveTextContent("Total");
+    expect(savingsSection).toHaveTextContent("+₹1,500.00");
+
+    const loanHeading = screen.getByRole("heading", { name: "Loan" });
+    const loanSection = loanHeading.closest("section");
+    expect(loanSection).not.toBeNull();
+    expect(loanSection).toHaveTextContent("Total");
+    expect(loanSection).toHaveTextContent("-₹500.00");
+  });
+
+  it("shows a clear error when account data is corrupt", async () => {
+    await db.accounts.put({
+      id: "40000000-0000-4000-8000-000000000499",
+      createdAt: "2026-11-26T00:00:00.000Z",
+      updatedAt: "2026-11-26T00:00:00.000Z",
+      deleted: false,
+      name: "",
+      type: "cash",
+      openingDate: "2026-11-26T00:00:00.000Z",
+      startingBalance: toPaise(0),
+      currency: "INR",
+      note: "",
+      hideFromTransactions: false,
+      hideFromReports: false,
+    });
+
+    render(<AccountsScreen />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to load accounts",
+    );
+  });
+
   it("creates an account and shows its derived balance", async () => {
     const user = userEvent.setup();
     render(<AccountsScreen />);
