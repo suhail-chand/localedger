@@ -25,7 +25,7 @@ import { SchedulesScreen } from "@/features/schedules/SchedulesScreen";
 
 const navigation = [
   { to: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { to: "/schedules", label: "Schedules", icon: CalendarClock },
+  { to: "/schedules", label: "Schedules (α)", icon: CalendarClock },
   { to: "/accounts", label: "Accounts", icon: CircleDollarSign },
   { to: "/categories", label: "Categories", icon: FolderTree },
   { to: "/payees", label: "Payees", icon: Users },
@@ -132,7 +132,14 @@ export default function App() {
     >
       <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
         <aside className="hidden border-r border-gray-200 bg-white px-4 py-6 dark:border-gray-800 dark:bg-gray-900 md:flex md:flex-col">
-          <h1 className="px-3 text-xl font-semibold">Localedger</h1>
+          <div className="flex items-center gap-3 px-3">
+            <img
+              src={`${import.meta.env.BASE_URL}/brand/logo-icon-192.png`}
+              alt="Localedger"
+              className="h-9 w-9 shrink-0 object-contain"
+            />
+            <h1 className="text-xl font-semibold tracking-tight">Localedger</h1>
+          </div>
           <nav className="mt-8 space-y-1" aria-label="Reference data">
             {navigation.map(({ to, label, icon: Icon }) => (
               <NavLink
@@ -158,7 +165,14 @@ export default function App() {
 
         <main className="min-w-0 pb-24 md:pb-0">
           <header className="flex h-14 items-center border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 md:hidden">
-            <h1 className="font-semibold">Localedger</h1>
+            <div className="flex items-center gap-2">
+              <img
+                src={`${import.meta.env.BASE_URL}/brand/logo-icon-192.png`}
+                alt="Localedger"
+                className="h-8 w-8 shrink-0 object-contain"
+              />
+              <h1 className="font-semibold tracking-tight">Localedger</h1>
+            </div>
           </header>
           <div className="p-4 md:p-8">
             {scheduleError ? (

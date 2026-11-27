@@ -24,6 +24,198 @@ function seedTimestamp(now: Date): string {
   return toUtcIso(now);
 }
 
+type StarterCategoryDefinition = {
+  name: string;
+  icon: string;
+};
+
+type StarterGroupDefinition = {
+  id?: string;
+  name: string;
+  kind: "expense" | "income";
+  categories: StarterCategoryDefinition[];
+};
+
+const STARTER_GROUPS: StarterGroupDefinition[] = [
+  // EXPENSE
+  {
+    name: "Housing",
+    kind: "expense",
+    categories: [
+      { name: "Rent", icon: "home" },
+      { name: "Home Maintenance", icon: "hammer" },
+      { name: "Home Supplies", icon: "lamp" },
+      { name: "Furniture", icon: "armchair" },
+    ],
+  },
+  {
+    name: "Food & Dining",
+    kind: "expense",
+    categories: [
+      { name: "Groceries", icon: "basket" },
+      { name: "Restaurants", icon: "utensils" },
+      { name: "Food Delivery", icon: "bike" },
+      { name: "Snacks", icon: "cookie" },
+    ],
+  },
+  {
+    name: "Transportation",
+    kind: "expense",
+    categories: [
+      { name: "Fuel", icon: "fuel" },
+      { name: "Public Transport", icon: "bus" },
+      { name: "Taxi", icon: "car-taxi-front" },
+      { name: "Vehicle Maintenance", icon: "wrench" },
+    ],
+  },
+  {
+    name: "Bills & Utilities",
+    kind: "expense",
+    categories: [
+      { name: "Electricity", icon: "zap" },
+      { name: "Water", icon: "droplets" },
+      { name: "Internet", icon: "wifi" },
+      { name: "Mobile", icon: "smartphone" },
+      { name: "Gas", icon: "flame" },
+    ],
+  },
+  {
+    name: "Health & Fitness",
+    kind: "expense",
+    categories: [
+      { name: "Medical", icon: "hospital" },
+      { name: "Pharmacy", icon: "pill" },
+      { name: "Doctor", icon: "stethoscope" },
+      { name: "Fitness", icon: "dumbbell" },
+    ],
+  },
+  {
+    name: "Shopping",
+    kind: "expense",
+    categories: [
+      { name: "Essentials", icon: "shopping-bag" },
+      { name: "Clothing", icon: "shirt" },
+      { name: "Accessories", icon: "watch" },
+      { name: "Electronics", icon: "monitor-pc" },
+      { name: "Digital", icon: "monitor-cloud" },
+    ],
+  },
+  {
+    name: "Personal & Family",
+    kind: "expense",
+    categories: [
+      { name: "Personal Care", icon: "user-round" },
+      { name: "Childcare", icon: "baby" },
+      { name: "Pets", icon: "paw-print" },
+      { name: "Allowances", icon: "users" },
+    ],
+  },
+  {
+    name: "Education",
+    kind: "expense",
+    categories: [
+      { name: "Tuition", icon: "education" },
+      { name: "Books", icon: "book" },
+      { name: "Courses", icon: "presentation" },
+    ],
+  },
+  {
+    name: "Entertainment",
+    kind: "expense",
+    categories: [
+      { name: "Movies", icon: "clapperboard" },
+      { name: "Games", icon: "gamepad" },
+      { name: "Subscriptions", icon: "monitor-play" },
+      { name: "Hobbies", icon: "palette" },
+      { name: "Activities", icon: "ball-wave" },
+    ],
+  },
+  {
+    name: "Travel",
+    kind: "expense",
+    categories: [
+      { name: "Flights", icon: "plane" },
+      { name: "Hotels", icon: "hotel" },
+      { name: "Local Travel", icon: "map" },
+      { name: "Vacation", icon: "palmtree" },
+    ],
+  },
+  {
+    name: "Finance & Taxes",
+    kind: "expense",
+    categories: [
+      { name: "Bank Charges", icon: "landmark" },
+      { name: "Loan Payments", icon: "hand-coins" },
+      { name: "Interest", icon: "percent" },
+      { name: "Tax", icon: "receipt" },
+      { name: "Insurance", icon: "shield-check" },
+    ],
+  },
+  {
+    name: "Gifts & Donations",
+    kind: "expense",
+    categories: [
+      { name: "Gifts", icon: "gift" },
+      { name: "Charity", icon: "heart-handshake" },
+      { name: "Religious Donations", icon: "hand-heart" },
+    ],
+  },
+
+  // INCOME
+  {
+    name: "Employment",
+    kind: "income",
+    categories: [
+      { name: "Salary", icon: "briefcase-business" },
+      { name: "Bonus", icon: "award" },
+      { name: "Allowances", icon: "wallet" },
+      { name: "Freelance", icon: "laptop" },
+    ],
+  },
+  {
+    name: "Business",
+    kind: "income",
+    categories: [
+      { name: "Business Income", icon: "store" },
+      { name: "Consulting", icon: "handshake" },
+      { name: "Sales", icon: "receipt" },
+    ],
+  },
+  {
+    name: "Investments",
+    kind: "income",
+    categories: [
+      { name: "Interest Earned", icon: "percent" },
+      { name: "Dividends", icon: "chart" },
+      { name: "Capital Gains", icon: "trending-up" },
+    ],
+  },
+  {
+    name: "Property",
+    kind: "income",
+    categories: [
+      { name: "Rental Income", icon: "houses" },
+      { name: "Property Sale", icon: "house-arrow-right" },
+    ],
+  },
+  {
+    id: SEED_IDS.incomeOtherGroup,
+    name: "Other",
+    kind: "income",
+    categories: [
+      { name: "Cashback", icon: "badge-percent" },
+      { name: "Refunds", icon: "undo" },
+      { name: "Rewards", icon: "trophy" },
+      { name: "Gifts", icon: "gift" },
+    ],
+  },
+];
+
+// Deterministic UUIDs. Never change the namespace or reuse an index.
+function starterId(namespace: "4" | "5", index: number): string {
+  return `${namespace}0000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+}
+
 export async function seedDefaults(
   database: LocaledgerDatabase,
   now = new Date(),
@@ -44,23 +236,46 @@ export async function seedDefaults(
         return;
       }
 
-      const groups: CategoryGroup[] = [
-        {
-          id: SEED_IDS.expenseGroup,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          deleted: false,
-          name: "Expenses",
-          kind: "expense",
-        },
-        {
-          id: SEED_IDS.incomeGroup,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          deleted: false,
-          name: "Income",
-          kind: "income",
-        },
+      const groups: CategoryGroup[] = [];
+      const categories: Category[] = [];
+
+      let groupIndex = 1;
+      let categoryIndex = 1;
+
+      for (const definition of STARTER_GROUPS) {
+        let groupId;
+        console.log("ID", definition?.id);
+        if (definition?.id) {
+          groupId = definition.id;
+        } else {
+          groupId = starterId("4", groupIndex++);
+
+          groups.push({
+            id: groupId,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            deleted: false,
+            name: definition.name,
+            kind: definition.kind,
+          });
+        }
+
+        for (const category of definition.categories) {
+          categories.push({
+            id: starterId("5", categoryIndex++),
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            deleted: false,
+            name: category.name,
+            icon: category.icon,
+            groupId,
+            kind: definition.kind,
+          });
+        }
+      }
+
+      // Preserve the existing built-in Other groups and categories.
+      groups.push(
         {
           id: SEED_IDS.expenseOtherGroup,
           createdAt: timestamp,
@@ -77,9 +292,9 @@ export async function seedDefaults(
           name: "Other",
           kind: "income",
         },
-      ];
+      );
 
-      const categories: Category[] = [
+      categories.push(
         {
           id: SEED_IDS.other,
           createdAt: timestamp,
@@ -102,27 +317,7 @@ export async function seedDefaults(
           kind: "income",
           builtIn: true,
         },
-        {
-          id: SEED_IDS.interest,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          deleted: false,
-          name: "Interest",
-          icon: "percent",
-          groupId: SEED_IDS.expenseGroup,
-          kind: "expense",
-        },
-        {
-          id: SEED_IDS.tax,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          deleted: false,
-          name: "Tax",
-          icon: "receipt",
-          groupId: SEED_IDS.expenseGroup,
-          kind: "expense",
-        },
-      ];
+      );
 
       const unspecified: Payee = {
         id: SEED_IDS.unspecified,
@@ -136,14 +331,17 @@ export async function seedDefaults(
       for (const group of groups) {
         categoryGroupSchema.parse(group);
       }
+
       for (const category of categories) {
         categorySchema.parse(category);
       }
+
       payeeSchema.parse(unspecified);
 
       await database.categoryGroups.bulkPut(groups);
       await database.categories.bulkPut(categories);
       await database.payees.put(unspecified);
+
       await database.metadata.put({
         key: "schema",
         version: LOCAL_SCHEMA_VERSION,

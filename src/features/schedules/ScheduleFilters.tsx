@@ -31,7 +31,7 @@ export function ScheduleFilters({ filters, onChange }: ScheduleFiltersProps) {
   }
 
   return (
-    <details className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+    <details className="rounded-xl border border-gray-200 bg-white px-3 dark:border-gray-800 dark:bg-gray-900">
       <summary className="min-h-11 cursor-pointer py-2 font-medium">
         Search and filters
       </summary>
