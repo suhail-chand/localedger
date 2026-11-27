@@ -134,7 +134,7 @@ export default function App() {
         <aside className="hidden border-r border-gray-200 bg-white px-4 py-6 dark:border-gray-800 dark:bg-gray-900 md:flex md:flex-col">
           <div className="flex items-center gap-3 px-3">
             <img
-              src={`${import.meta.env.BASE_URL}/brand/logo-icon-192.png`}
+              src={`${import.meta.env.BASE_URL}brand/logo-icon-192.png`}
               alt="Localedger"
               className="h-9 w-9 shrink-0 object-contain"
             />
@@ -167,7 +167,7 @@ export default function App() {
           <header className="flex h-14 items-center border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 md:hidden">
             <div className="flex items-center gap-2">
               <img
-                src={`${import.meta.env.BASE_URL}/brand/logo-icon-192.png`}
+                src={`${import.meta.env.BASE_URL}brand/logo-icon-192.png`}
                 alt="Localedger"
                 className="h-8 w-8 shrink-0 object-contain"
               />
