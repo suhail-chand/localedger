@@ -2,6 +2,7 @@
 description: Rules for IndexedDB (Dexie), repositories, migrations, backup and trash
 applyTo: "src/data/**"
 ---
+
 - All reads and writes go through repository modules. Each write sets `updatedAt` (UTC now) and validates with Zod before saving.
 - Deletes are soft (`deleted: true`, bump `updatedAt`). Provide separate explicit functions for restore-from-trash and permanent purge.
 - Multi-record changes (a transaction with splits, category reassignment, etc.) happen inside a single Dexie transaction.
