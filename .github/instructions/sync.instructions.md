@@ -2,6 +2,7 @@
 description: Rules for Google auth and Drive sync
 applyTo: "src/sync/**"
 ---
+
 - Auth: Google Identity Services **token flow** in the browser only, scope `drive.appdata` only. No client secret. Keep the access token in memory, never persist it. If silent renewal fails, pause sync and show "Sign in to resume sync" without interrupting local use.
 - Sync order is always: **pull, merge per record, then push.** Check the remote revision or `modifiedTime` immediately before writing, and re-pull if it changed.
 - Merge rule per record ID: highest `updatedAt` wins, ties broken by `deviceId`. Tombstones propagate deletes. Never resurrect a tombstoned record from an older copy.

@@ -5,6 +5,7 @@ Localedger is an open-source, single-user, local-first personal finance tracker 
 **Priorities, in order:** 1) data integrity, retention and safety, 2) fast low-friction transaction entry, 3) clear overview of accounts and spending.
 
 Always read these before non-trivial work. Do not re-derive what they already decide:
+
 - `docs/requirements.md`: the full product spec (source of truth for behavior)
 - `docs/data-model.md`: entity shapes, ID and timestamp rules, Drive file layout
 - `docs/architecture.md`: stack, folder structure, layering rules
@@ -12,9 +13,11 @@ Always read these before non-trivial work. Do not re-derive what they already de
 - `docs/decisions.md`: assumptions and decisions made so far (append to it)
 
 ## Tech stack (do not substitute without asking)
+
 Vite, React 18, TypeScript (strict), React Router (`HashRouter`), Dexie (IndexedDB), Zod (validation), date-fns, Tailwind CSS, lucide-react (icons), Vitest + React Testing Library + fake-indexeddb, ESLint + Prettier, vite-plugin-pwa. Package manager: npm. Do not add dependencies without stating why and checking that a small in-house function would not do.
 
 ## Non-negotiable rules
+
 1. **Money is integer paise.** Never use floats for money anywhere (state, storage, math, tests). Convert to/from display strings only at the UI edge, via `src/domain/money.ts`. Display always has exactly 2 decimals, an INR symbol, and a sign (`+` credit, `-` debit, none for transfers), e.g. `+₹1,234.50`, with Indian digit grouping.
 2. **Never use `eval`, `new Function`, or similar** for the amount calculator. Use the hand-written parser in `src/domain/calculator.ts`.
 3. **Time:** store UTC ISO 8601 strings, display and enter local time. Use date-fns. Never store local-time strings.
@@ -29,9 +32,11 @@ Vite, React 18, TypeScript (strict), React Router (`HashRouter`), Dexie (Indexed
 12. **Out of scope** (do not build or stub): any import (including Bluecoins), budgeting, multi-user/sharing, multi-currency conversion, Google Calendar API, bank sync, SMS parsing, any backend, client-side encryption. Restoring the app's own JSON backup is allowed.
 
 ## Layering
+
 `domain` (pure TS: types, schemas, money, calculator, balances, EMI, recurrence, merge) → `data` (Dexie, repositories, migrations, backup) → `sync` (Drive client, auth, sync engine) → `features` (React UI). Lower layers must never import from higher layers. `domain` must not import React, Dexie, or browser APIs.
 
 ## How to work
+
 - **Plan first for anything touching more than 2 files:** state the plan, list the files you will change, then implement. For large features use the `/plan-feature` prompt.
 - **Work in small, complete vertical slices.** Each slice must compile, pass lint and tests, and leave the app working.
 - **Write tests with the code** for all `domain` and `data` logic. Cover edge cases: rounding, zero, negatives, leap years, month-end dates, DST, tombstones, concurrent edits.
@@ -42,7 +47,9 @@ Vite, React 18, TypeScript (strict), React Router (`HashRouter`), Dexie (Indexed
 - Comments explain **why**, not what. Remove dead code and unused imports.
 
 ## UI conventions
+
 Mobile-first, one-handed use, touch targets of at least 44px, accessible (labels, focus, keyboard, aria), light and dark themes. Every destructive action needs confirmation or undo. Show clear empty, loading and error states. Forms show inline validation messages.
 
 ## When unsure about Google, Copilot or library APIs
+
 Check the official docs rather than guessing, and say when something should be verified.

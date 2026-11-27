@@ -2,6 +2,7 @@
 description: Reproduce, fix and prevent a bug
 agent: agent
 ---
+
 Bug: ${input:bug:Describe the bug, steps to reproduce, expected vs actual}
 
 1. Find the root cause (do not patch symptoms). Explain it briefly.

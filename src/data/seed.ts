@@ -211,11 +211,6 @@ const STARTER_GROUPS: StarterGroupDefinition[] = [
   },
 ];
 
-// Deterministic UUIDs. Never change the namespace or reuse an index.
-function starterId(namespace: "4" | "5", index: number): string {
-  return `${namespace}0000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
-}
-
 export async function seedDefaults(
   database: LocaledgerDatabase,
   now = new Date(),
@@ -239,16 +234,13 @@ export async function seedDefaults(
       const groups: CategoryGroup[] = [];
       const categories: Category[] = [];
 
-      let groupIndex = 1;
-      let categoryIndex = 1;
-
       for (const definition of STARTER_GROUPS) {
         let groupId;
-        console.log("ID", definition?.id);
+
         if (definition?.id) {
           groupId = definition.id;
         } else {
-          groupId = starterId("4", groupIndex++);
+          groupId = crypto.randomUUID();
 
           groups.push({
             id: groupId,
@@ -262,7 +254,7 @@ export async function seedDefaults(
 
         for (const category of definition.categories) {
           categories.push({
-            id: starterId("5", categoryIndex++),
+            id: crypto.randomUUID(),
             createdAt: timestamp,
             updatedAt: timestamp,
             deleted: false,

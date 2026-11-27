@@ -36,6 +36,24 @@ async function setupDatabase(name: string): Promise<LocaledgerDatabase> {
   return database;
 }
 
+async function getCategoryGroupId(
+  database: LocaledgerDatabase,
+  name: string,
+  kind: "expense" | "income",
+): Promise<string> {
+  const group = await database.categoryGroups
+    .where("name")
+    .equals(name)
+    .filter((record) => record.kind === kind && !record.deleted)
+    .first();
+
+  if (!group) {
+    throw new Error(`Missing ${kind} category group: ${name}`);
+  }
+
+  return group.id;
+}
+
 afterEach(async () => {
   await Promise.all(
     databases.splice(0).map(async (database) => {
@@ -458,10 +476,16 @@ describe("data repositories", () => {
     const other = await database.categories.get(SEED_IDS.other);
     if (!other) throw new Error("Other category missing");
 
+    const expenseGroupId = await getCategoryGroupId(
+      database,
+      "Food & Dining",
+      "expense",
+    );
+
     const category = await categories.create({
       name: "Food",
       icon: "utensils",
-      groupId: "10000000-0000-4000-8000-000000000001",
+      groupId: expenseGroupId,
       kind: "expense",
     });
     const account = await createAccountRepository(
@@ -519,10 +543,15 @@ describe("data repositories", () => {
       hideFromTransactions: false,
       hideFromReports: false,
     });
+    const incomeGroupId = await getCategoryGroupId(
+      database,
+      "Employment",
+      "income",
+    );
     const category = await categories.create({
       name: "Salary",
       icon: "briefcase",
-      groupId: SEED_IDS.incomeGroup,
+      groupId: incomeGroupId,
       kind: "income",
     });
     const transaction = await transactions.create({
@@ -594,10 +623,15 @@ describe("data repositories", () => {
     const database = await setupDatabase("category-corrupt-unrelated");
     await ensureDatabaseReady(database);
     const categories = createCategoryRepository(database);
+    const expenseGroupId = await getCategoryGroupId(
+      database,
+      "Food & Dining",
+      "expense",
+    );
     const category = await categories.create({
       name: "Food",
       icon: "utensils",
-      groupId: "10000000-0000-4000-8000-000000000001",
+      groupId: expenseGroupId,
       kind: "expense",
     });
     await database.transactions.put({
@@ -613,10 +647,15 @@ describe("data repositories", () => {
   it("rejects a same-name category fallback whose ID is not the seeded ID", async () => {
     const database = await setupDatabase("category-invalid-fallback-id");
     const categories = createCategoryRepository(database);
+    const expenseGroupId = await getCategoryGroupId(
+      database,
+      "Food & Dining",
+      "expense",
+    );
     const category = await categories.create({
       name: "Food",
       icon: "utensils",
-      groupId: "10000000-0000-4000-8000-000000000001",
+      groupId: expenseGroupId,
       kind: "expense",
     });
     await database.categories.delete("20000000-0000-4000-8000-000000000001");
@@ -1087,10 +1126,15 @@ describe("data repositories", () => {
     const schedules = createScheduleRepository(database);
     const accounts = createAccountRepository(database);
 
+    const expenseGroupId = await getCategoryGroupId(
+      database,
+      "Food & Dining",
+      "expense",
+    );
     const category = await categories.create({
       name: "Food",
       icon: "utensils",
-      groupId: "10000000-0000-4000-8000-000000000001",
+      groupId: expenseGroupId,
       kind: "expense",
     });
     const payee = await payees.create({ name: "Shop" });
@@ -1175,10 +1219,15 @@ describe("data repositories", () => {
       hideFromTransactions: false,
       hideFromReports: false,
     });
+    const incomeGroupId = await getCategoryGroupId(
+      database,
+      "Employment",
+      "income",
+    );
     const incomeCategory = await categories.create({
       name: "Salary",
       icon: "wallet",
-      groupId: SEED_IDS.incomeGroup,
+      groupId: incomeGroupId,
       kind: "income",
     });
     await expect(
