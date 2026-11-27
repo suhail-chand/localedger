@@ -1,11 +1,41 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+
+const scheduleEvaluation = vi.hoisted(() => ({
+  evaluateSchedules: vi.fn(() =>
+    Promise.resolve({
+      schedulesEvaluated: 0,
+      transactionsRecorded: 0,
+      occurrencesSkipped: 0,
+    }),
+  ),
+}));
+
+vi.mock("@/data/scheduleEvaluation", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/data/scheduleEvaluation")>();
+  return {
+    ...actual,
+    evaluateSchedules: scheduleEvaluation.evaluateSchedules,
+  };
+});
 
 describe("App", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "#/");
+    scheduleEvaluation.evaluateSchedules.mockClear();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
   });
 
   it("opens the transactions screen by default and shows persistent-storage status", async () => {
@@ -94,5 +124,54 @@ describe("App", () => {
     expect(
       screen.getAllByRole("heading", { name: "Transactions" }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("evaluates schedules on open and on foreground", async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(scheduleEvaluation.evaluateSchedules).toHaveBeenCalled();
+    });
+    const initialCalls = scheduleEvaluation.evaluateSchedules.mock.calls.length;
+
+    fireEvent(window, new Event("focus"));
+    await waitFor(() => {
+      expect(scheduleEvaluation.evaluateSchedules).toHaveBeenCalledTimes(
+        initialCalls + 1,
+      );
+    });
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    fireEvent(document, new Event("visibilitychange"));
+    await waitFor(() => {
+      expect(scheduleEvaluation.evaluateSchedules).toHaveBeenCalledTimes(
+        initialCalls + 2,
+      );
+    });
+  });
+
+  it("evaluates schedules after schedule changes and shows failures", async () => {
+    scheduleEvaluation.evaluateSchedules.mockRejectedValueOnce(
+      new Error("IndexedDB unavailable"),
+    );
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Schedule evaluation failed: IndexedDB unavailable",
+    );
+
+    scheduleEvaluation.evaluateSchedules.mockResolvedValueOnce({
+      schedulesEvaluated: 0,
+      transactionsRecorded: 0,
+      occurrencesSkipped: 0,
+    });
+    fireEvent(window, new Event("localedger:schedules-changed"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
   });
 });

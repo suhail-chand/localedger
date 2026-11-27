@@ -1017,3 +1017,13 @@ export const repositories = {
   occurrences: createOccurrenceRepository(db),
   settings: createSettingsRepository(db),
 };
+
+export {
+  endSchedule,
+  evaluateSchedules,
+  pauseSchedule,
+  recordScheduleOccurrence,
+  skipScheduleOccurrence,
+  OccurrenceAlreadyRecordedError,
+  OccurrenceAlreadySkippedError,
+} from "@/data/scheduleEvaluation";
