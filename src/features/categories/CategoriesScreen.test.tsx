@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { db, ensureDatabaseReady } from "@/data/db";
-import { createCategoryGroupRepository, createCategoryRepository } from "@/data/repositories";
+import {
+  createCategoryGroupRepository,
+  createCategoryRepository,
+} from "@/data/repositories";
 import { SEED_IDS } from "@/data/seed";
 import { CategoriesScreen } from "./CategoriesScreen";
 
@@ -24,7 +27,9 @@ describe("CategoriesScreen", () => {
     await user.selectOptions(within(dialog).getByLabelText("Kind"), "income");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    await user.click(await screen.findByRole("button", { name: "Add category" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Add category" }),
+    );
     dialog = screen.getByRole("dialog", { name: "Add category" });
     await user.type(within(dialog).getByLabelText("Name"), "Pay");
     await user.selectOptions(within(dialog).getByLabelText("Kind"), "income");
@@ -49,8 +54,12 @@ describe("CategoriesScreen", () => {
     render(<CategoriesScreen />);
 
     await screen.findByText("Other");
-    expect(screen.queryByRole("button", { name: "Edit Other" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete Other" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit Other" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete Other" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows protected Other groups and categories for both kinds", async () => {
@@ -100,24 +109,45 @@ describe("CategoriesScreen", () => {
     render(<CategoriesScreen />);
 
     expect(await screen.findAllByText("Built-in")).toHaveLength(4);
-    expect(screen.queryByRole("button", { name: "Edit Other" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete Other" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit group Other" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete group Other" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit Other" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete Other" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit group Other" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete group Other" }),
+    ).not.toBeInTheDocument();
   });
 
   it("blocks deleting a group that contains categories", async () => {
     const groups = createCategoryGroupRepository(db);
     const categories = createCategoryRepository(db);
     const group = await groups.create({ name: "Food", kind: "expense" });
-    await categories.create({ name: "Groceries", icon: "basket", groupId: group.id, kind: "expense" });
+    await categories.create({
+      name: "Groceries",
+      icon: "basket",
+      groupId: group.id,
+      kind: "expense",
+    });
     const user = userEvent.setup();
     render(<CategoriesScreen />);
 
-    await user.click(await screen.findByRole("button", { name: "Delete group Food" }));
-    const confirmation = screen.getByRole("alertdialog", { name: "Delete Food?" });
-    await user.click(within(confirmation).getByRole("button", { name: "Delete" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Delete group Food" }),
+    );
+    const confirmation = screen.getByRole("alertdialog", {
+      name: "Delete Food?",
+    });
+    await user.click(
+      within(confirmation).getByRole("button", { name: "Delete" }),
+    );
 
-    expect(await within(confirmation).findByText(/Category group is in use/i)).toBeInTheDocument();
+    expect(
+      await within(confirmation).findByText(/Category group is in use/i),
+    ).toBeInTheDocument();
   });
 });

@@ -48,7 +48,9 @@ describe("AccountsScreen", () => {
 
     render(<AccountsScreen />);
 
-    expect((await screen.findAllByText("+₹1,234.50")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("+₹1,234.50")).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("shows assets, liabilities, net worth and account-type totals", async () => {
@@ -148,7 +150,9 @@ describe("AccountsScreen", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Salary" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Salary" }),
+      ).toBeInTheDocument();
     });
     expect(await db.accounts.count()).toBe(1);
   });
@@ -197,11 +201,15 @@ describe("AccountsScreen", () => {
     const user = userEvent.setup();
     render(<AccountsScreen />);
 
-    await user.click(await screen.findByRole("button", { name: "Delete Wallet" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Delete Wallet" }),
+    );
     const confirmation = screen.getByRole("alertdialog", {
       name: "Delete Wallet?",
     });
-    await user.click(within(confirmation).getByRole("button", { name: "Delete" }));
+    await user.click(
+      within(confirmation).getByRole("button", { name: "Delete" }),
+    );
 
     await waitFor(() => {
       expect(

@@ -174,7 +174,9 @@ export async function migrateCategoryFallbacks(
         expenseOther.builtIn !== true ||
         expenseOther.kind !== "expense"
       ) {
-        throw new Error("Built-in Expense Other category is missing or invalid");
+        throw new Error(
+          "Built-in Expense Other category is missing or invalid",
+        );
       }
 
       const groups: CategoryGroup[] = [

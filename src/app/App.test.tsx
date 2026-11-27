@@ -8,11 +8,11 @@ describe("App", () => {
     window.history.replaceState(null, "", "#/");
   });
 
-  it("opens the accounts screen by default and shows persistent-storage status", async () => {
+  it("opens the transactions screen by default and shows persistent-storage status", async () => {
     render(<App />);
 
     expect(
-      screen.getAllByRole("heading", { name: "Accounts" }).length,
+      screen.getAllByRole("heading", { name: "Transactions" }).length,
     ).toBeGreaterThan(0);
     await waitFor(() => {
       expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
@@ -44,6 +44,13 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    const accountsLink = screen
+      .getAllByRole("link", { name: "Accounts" })
+      .at(0);
+    if (!accountsLink)
+      throw new Error("Accounts navigation link was not rendered");
+    await user.click(accountsLink);
+
     const addAccountButton = screen
       .getAllByRole("button", { name: "Add account" })
       .at(0);
@@ -61,9 +68,7 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const payeesLink = screen
-      .getAllByRole("link", { name: "Payees" })
-      .at(0);
+    const payeesLink = screen.getAllByRole("link", { name: "Payees" }).at(0);
     if (!payeesLink) throw new Error("Payees navigation link was not rendered");
     await user.click(payeesLink);
     expect(
@@ -82,12 +87,12 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("redirects unknown hash routes to accounts", async () => {
+  it("redirects unknown hash routes to transactions", async () => {
     window.history.replaceState(null, "", "#/unknown");
     render(<App />);
 
     expect(
-      screen.getAllByRole("heading", { name: "Accounts" }).length,
+      screen.getAllByRole("heading", { name: "Transactions" }).length,
     ).toBeGreaterThan(0);
   });
 });

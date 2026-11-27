@@ -1,16 +1,11 @@
 import { useEffect, useState } from "react";
-import {
-  HashRouter,
-  Navigate,
-  NavLink,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { HashRouter, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import {
   CircleDollarSign,
   FolderTree,
   Tags,
   Users,
+  ArrowLeftRight,
 } from "lucide-react";
 
 import {
@@ -23,8 +18,10 @@ import { AccountsScreen } from "@/features/accounts/AccountsScreen";
 import { CategoriesScreen } from "@/features/categories/CategoriesScreen";
 import { PayeesScreen } from "@/features/payees/PayeesScreen";
 import { LabelsScreen } from "@/features/labels/LabelsScreen";
+import { TransactionsScreen } from "@/features/transactions/TransactionsScreen";
 
 const navigation = [
+  { to: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { to: "/accounts", label: "Accounts", icon: CircleDollarSign },
   { to: "/categories", label: "Categories", icon: FolderTree },
   { to: "/payees", label: "Payees", icon: Users },
@@ -96,36 +93,31 @@ export default function App() {
           </p>
         </aside>
 
-        <main className="min-w-0 pb-20 md:pb-0">
+        <main className="min-w-0 pb-24 md:pb-0">
           <header className="flex h-14 items-center border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 md:hidden">
             <h1 className="font-semibold">Localedger</h1>
           </header>
           <div className="p-4 md:p-8">
             <Routes>
-              <Route path="/" element={<Navigate to="/accounts" replace />} />
               <Route
-                path="/accounts"
-                element={<AccountsScreen />}
+                path="/"
+                element={<Navigate to="/transactions" replace />}
               />
+              <Route path="/transactions" element={<TransactionsScreen />} />
+              <Route path="/accounts" element={<AccountsScreen />} />
+              <Route path="/categories" element={<CategoriesScreen />} />
+              <Route path="/payees" element={<PayeesScreen />} />
+              <Route path="/labels" element={<LabelsScreen />} />
               <Route
-                path="/categories"
-                element={<CategoriesScreen />}
+                path="*"
+                element={<Navigate to="/transactions" replace />}
               />
-              <Route
-                path="/payees"
-                element={<PayeesScreen />}
-              />
-              <Route
-                path="/labels"
-                element={<LabelsScreen />}
-              />
-              <Route path="*" element={<Navigate to="/accounts" replace />} />
             </Routes>
           </div>
         </main>
 
         <nav
-          className="fixed inset-x-0 bottom-0 grid h-16 grid-cols-4 border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 grid h-16 grid-cols-5 border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 md:hidden"
           aria-label="Reference data mobile"
         >
           {navigation.map(({ to, label, icon: Icon }) => (

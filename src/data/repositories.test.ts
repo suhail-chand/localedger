@@ -582,7 +582,9 @@ describe("data repositories", () => {
       type: "income",
       categoryId: SEED_IDS.incomeOther,
     });
-    expect((await schedules.get(schedule.id))?.template.splits[0]).toMatchObject({
+    expect(
+      (await schedules.get(schedule.id))?.template.splits[0],
+    ).toMatchObject({
       type: "income",
       categoryId: SEED_IDS.incomeOther,
     });
@@ -978,9 +980,9 @@ describe("data repositories", () => {
       kind: "expense",
     });
 
-    await expect(
-      groups.update(group.id, { kind: "income" }),
-    ).rejects.toThrow("Category group kind cannot differ");
+    await expect(groups.update(group.id, { kind: "income" })).rejects.toThrow(
+      "Category group kind cannot differ",
+    );
   });
 
   it("blocks deleting groups that still contain active records", async () => {
@@ -1018,9 +1020,9 @@ describe("data repositories", () => {
     await expect(
       groups.update(SEED_IDS.expenseOtherGroup, { name: "Expenses" }),
     ).rejects.toThrow("Built-in Other category groups cannot be edited");
-    await expect(
-      groups.softDelete(SEED_IDS.incomeOtherGroup),
-    ).rejects.toThrow("Built-in Other category groups cannot be deleted");
+    await expect(groups.softDelete(SEED_IDS.incomeOtherGroup)).rejects.toThrow(
+      "Built-in Other category groups cannot be deleted",
+    );
     expect(await groups.get(SEED_IDS.expenseOtherGroup)).toMatchObject({
       name: "Other",
       kind: "expense",

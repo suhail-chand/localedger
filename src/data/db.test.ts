@@ -145,7 +145,9 @@ describe("Localedger IndexedDB foundation", () => {
       kind: "expense",
       groupId: SEED_IDS.expenseOtherGroup,
     });
-    expect(await database.categoryGroups.get(SEED_IDS.expenseOtherGroup)).toMatchObject({
+    expect(
+      await database.categoryGroups.get(SEED_IDS.expenseOtherGroup),
+    ).toMatchObject({
       name: "Other",
       kind: "expense",
       deleted: false,
@@ -157,7 +159,9 @@ describe("Localedger IndexedDB foundation", () => {
       kind: "income",
       groupId: SEED_IDS.incomeOtherGroup,
     });
-    expect(await database.categoryGroups.get(SEED_IDS.incomeOtherGroup)).toMatchObject({
+    expect(
+      await database.categoryGroups.get(SEED_IDS.incomeOtherGroup),
+    ).toMatchObject({
       name: "Other",
       kind: "income",
       deleted: false,

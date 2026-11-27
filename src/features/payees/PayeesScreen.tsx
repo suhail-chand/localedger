@@ -36,27 +36,21 @@ export function PayeesScreen() {
   const [deleteError, setDeleteError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const data = useLiveQuery(
-    async () => {
-      try {
-        return {
-          groups: await groupRepository.list(),
-          payees: await payeeRepository.list(),
-          error: null,
-        };
-      } catch (error) {
-        return {
-          groups: null,
-          payees: null,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Unable to load payees",
-        };
-      }
-    },
-    [],
-  );
+  const data = useLiveQuery(async () => {
+    try {
+      return {
+        groups: await groupRepository.list(),
+        payees: await payeeRepository.list(),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        groups: null,
+        payees: null,
+        error: error instanceof Error ? error.message : "Unable to load payees",
+      };
+    }
+  }, []);
   const groups = useMemo(() => data?.groups ?? [], [data]);
   const payees = useMemo(() => data?.payees ?? [], [data]);
 
@@ -235,7 +229,10 @@ export function PayeesScreen() {
           Loading payees...
         </p>
       ) : data.error ? (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
           Unable to load payees: {data.error}
         </p>
       ) : groups.length === 0 && payees.length === 0 ? (

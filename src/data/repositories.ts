@@ -250,7 +250,10 @@ export function createCategoryGroupRepository(
   );
   return {
     ...repository,
-    async update(id: string, changes: RecordChanges<CategoryGroup>): Promise<CategoryGroup> {
+    async update(
+      id: string,
+      changes: RecordChanges<CategoryGroup>,
+    ): Promise<CategoryGroup> {
       return database.transaction(
         "rw",
         [database.categoryGroups, database.categories],

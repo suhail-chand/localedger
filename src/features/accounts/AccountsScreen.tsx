@@ -105,27 +105,22 @@ export function AccountsScreen() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AccountFormValues>(() => toFormValues());
 
-  const data = useLiveQuery(
-    async () => {
-      try {
-        return {
-          accounts: await accountRepository.list(),
-          transactions: await transactionRepository.list(),
-          error: null,
-        };
-      } catch (error) {
-        return {
-          accounts: null,
-          transactions: null,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Unable to load accounts",
-        };
-      }
-    },
-    [],
-  );
+  const data = useLiveQuery(async () => {
+    try {
+      return {
+        accounts: await accountRepository.list(),
+        transactions: await transactionRepository.list(),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        accounts: null,
+        transactions: null,
+        error:
+          error instanceof Error ? error.message : "Unable to load accounts",
+      };
+    }
+  }, []);
 
   const accounts = useMemo(() => data?.accounts ?? [], [data]);
   const transactions = useMemo(() => data?.transactions ?? [], [data]);
@@ -235,7 +230,10 @@ export function AccountsScreen() {
           Loading accounts...
         </p>
       ) : data.error ? (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
           Unable to load accounts: {data.error}
         </p>
       ) : accounts.length === 0 ? (
@@ -274,7 +272,9 @@ export function AccountsScreen() {
           </div>
 
           {accountTypes.map((type) => {
-            const matching = accounts.filter((account) => account.type === type);
+            const matching = accounts.filter(
+              (account) => account.type === type,
+            );
             if (matching.length === 0) return null;
             return (
               <section key={type} className="mb-6">

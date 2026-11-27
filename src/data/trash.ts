@@ -35,12 +35,9 @@ async function assertCategoryFallbackAvailable(
   database: LocaledgerDatabase,
   kind: "expense" | "income",
 ): Promise<string> {
-  const fallbackId =
-    kind === "expense" ? SEED_IDS.other : SEED_IDS.incomeOther;
+  const fallbackId = kind === "expense" ? SEED_IDS.other : SEED_IDS.incomeOther;
   const groupId =
-    kind === "expense"
-      ? SEED_IDS.expenseOtherGroup
-      : SEED_IDS.incomeOtherGroup;
+    kind === "expense" ? SEED_IDS.expenseOtherGroup : SEED_IDS.incomeOtherGroup;
   const fallback = categorySchema.safeParse(
     await database.categories.get(fallbackId),
   );
@@ -408,7 +405,10 @@ export async function purgeTrash(
               template: { ...schedule.template, splits },
               updatedAt: timestamp,
             });
-            await assertCategoryKindsAvailable(database, updated.template.splits);
+            await assertCategoryKindsAvailable(
+              database,
+              updated.template.splits,
+            );
             await database.scheduledTransactions.put(updated);
           }
         }
